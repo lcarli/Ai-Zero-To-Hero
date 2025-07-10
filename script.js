@@ -134,14 +134,172 @@ function toggleCollapse(sectionId) {
 }
 
 // Process text and show results
-function processText(text) {
-    // Language detection
-    const detectedLanguage = detectLanguage(text);
-    displayLanguageResult(detectedLanguage);
+async function processText(text) {
+    // Language detection with API and fallback
+    const detectedLanguage = await detectLanguageWithAPI(text);
+    displayLanguageResult(detectedLanguage, text);
     
     // Tokenization
     const tokens = tokenizeText(text);
     displayTokens(tokens);
+}
+
+// Global config variable
+let config = null;
+
+// Load configuration
+async function loadConfig() {
+    if (config) return config;
+    
+    try {
+        const response = await fetch('../config.json');
+        if (!response.ok) throw new Error('Config not found');
+        config = await response.json();
+        return config;
+    } catch (error) {
+        console.warn('Failed to load config, using defaults:', error);
+        config = {
+            languageDetection: {
+                apis: [],
+                fallback: { enabled: true, algorithm: 'local' }
+            }
+        };
+        return config;
+    }
+}
+
+// Enhanced language detection with API integration
+async function detectLanguageWithAPI(text) {
+    const config = await loadConfig();
+    
+    // Try API detection first
+    for (const api of config.languageDetection.apis) {
+        if (!api.enabled) continue;
+        
+        try {
+            const result = await callLanguageAPI(api, text);
+            if (result) {
+                return {
+                    ...result,
+                    source: 'api',
+                    apiName: api.name
+                };
+            }
+        } catch (error) {
+            console.warn(`API ${api.name} failed:`, error);
+        }
+    }
+    
+    // Fallback to local detection
+    if (config.languageDetection.fallback.enabled) {
+        const result = detectLanguage(text);
+        return {
+            ...result,
+            source: 'local',
+            apiName: 'Local Algorithm'
+        };
+    }
+    
+    return null;
+}
+
+// Call language detection API
+async function callLanguageAPI(api, text) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), api.timeout || 5000);
+    
+    try {
+        const body = JSON.stringify(
+            replaceTemplate(api.bodyTemplate, { text })
+        );
+        
+        const response = await fetch(api.url, {
+            method: api.method,
+            headers: api.headers,
+            body: body,
+            signal: controller.signal
+        });
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const data = await response.json();
+        
+        // Extract language and confidence based on API response format
+        const language = getNestedValue(data, api.responseFormat.language);
+        const confidence = getNestedValue(data, api.responseFormat.confidence);
+        
+        if (language) {
+            return {
+                code: language,
+                name: getLanguageName(language),
+                flag: getLanguageFlag(language),
+                confidence: Math.round(confidence * 100) || 50
+            };
+        }
+    } catch (error) {
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+    
+    return null;
+}
+
+// Helper functions
+function replaceTemplate(template, variables) {
+    const result = {};
+    for (const key in template) {
+        let value = template[key];
+        if (typeof value === 'string') {
+            value = value.replace(/\{(\w+)\}/g, (match, varName) => {
+                return variables[varName] || match;
+            });
+        }
+        result[key] = value;
+    }
+    return result;
+}
+
+function getNestedValue(obj, path) {
+    return path.split('.').reduce((current, key) => {
+        return current && current[key] !== undefined ? current[key] : null;
+    }, obj);
+}
+
+function getLanguageName(code) {
+    const names = {
+        'en': 'English',
+        'es': 'Spanish', 
+        'fr': 'French',
+        'de': 'German',
+        'it': 'Italian',
+        'pt': 'Portuguese',
+        'ru': 'Russian',
+        'ja': 'Japanese',
+        'ko': 'Korean',
+        'zh': 'Chinese',
+        'ar': 'Arabic',
+        'hi': 'Hindi'
+    };
+    return names[code] || code.toUpperCase();
+}
+
+function getLanguageFlag(code) {
+    const flags = {
+        'en': '🇺🇸',
+        'es': '🇪🇸',
+        'fr': '🇫🇷',
+        'de': '🇩🇪',
+        'it': '🇮🇹',
+        'pt': '🇵🇹',
+        'ru': '🇷🇺',
+        'ja': '🇯🇵',
+        'ko': '🇰🇷',
+        'zh': '🇨🇳',
+        'ar': '🇸🇦',
+        'hi': '🇮🇳'
+    };
+    return flags[code] || '🌐';
 }
 
 // Simple language detection based on character patterns and common words
@@ -231,10 +389,41 @@ function detectLanguage(text) {
     };
 }
 
-// Display language detection result
-function displayLanguageResult(result) {
+// Display language detection result with detailed examples
+function displayLanguageResult(result, inputText) {
     const resultContainer = document.getElementById('language-result');
+    const algorithmContainer = document.querySelector('#language-detection .algorithm-explanation');
     
+    // Update the algorithm explanation with user input examples
+    algorithmContainer.innerHTML = `
+        <h4>Algorithm Used:</h4>
+        <p>Character frequency analysis combined with common word patterns:</p>
+        <ul>
+            <li><strong>Analyze character frequency patterns</strong>
+                <div class="example-box">
+                    <strong>Example with your text:</strong> "${inputText}"<br>
+                    <em>Character analysis:</em> ${analyzeCharacterFrequency(inputText)}
+                </div>
+            </li>
+            <li><strong>Check for language-specific characters (é, ñ, ü, etc.)</strong>
+                <div class="example-box">
+                    <strong>Special characters found:</strong> ${findSpecialCharacters(inputText)}
+                </div>
+            </li>
+            <li><strong>Match against common words in different languages</strong>
+                <div class="example-box">
+                    <strong>Common words detected:</strong> ${findCommonWords(inputText)}
+                </div>
+            </li>
+            <li><strong>Calculate probability scores for each language</strong>
+                <div class="example-box">
+                    <strong>Language scores:</strong> ${calculateLanguageScores(inputText)}
+                </div>
+            </li>
+        </ul>
+    `;
+    
+    // Display the detection result
     resultContainer.innerHTML = `
         <div class="language-info">
             <div class="language-flag">${result.flag}</div>
@@ -244,9 +433,105 @@ function displayLanguageResult(result) {
                 <div class="confidence-bar">
                     <div class="confidence-fill" style="width: ${result.confidence}%"></div>
                 </div>
+                <div class="detection-source">
+                    <small>Source: ${result.source === 'api' ? `${result.apiName} API` : 'Local Algorithm'}</small>
+                </div>
             </div>
         </div>
     `;
+}
+
+// Helper functions for detailed analysis
+function analyzeCharacterFrequency(text) {
+    const freq = {};
+    const cleaned = text.toLowerCase().replace(/[^a-zA-ZàâäéèêëïîôöùûüÿçñáéíóúüÑÁÉÍÓÚÜ]/g, '');
+    
+    for (const char of cleaned) {
+        freq[char] = (freq[char] || 0) + 1;
+    }
+    
+    const sortedChars = Object.entries(freq)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+    
+    return sortedChars.map(([char, count]) => `'${char}' (${count})`).join(', ');
+}
+
+function findSpecialCharacters(text) {
+    const specialChars = text.match(/[àâäéèêëïîôöùûüÿçñáéíóúüÑÁÉÍÓÚÜ]/g);
+    if (!specialChars || specialChars.length === 0) {
+        return 'None detected';
+    }
+    
+    const uniqueChars = [...new Set(specialChars)];
+    return uniqueChars.join(', ');
+}
+
+function findCommonWords(text) {
+    const words = text.toLowerCase().split(/\s+/);
+    const commonWords = {
+        'en': ['the', 'and', 'is', 'in', 'to', 'of', 'a', 'that', 'it', 'with', 'for', 'as', 'was', 'on', 'are'],
+        'es': ['el', 'la', 'de', 'que', 'y', 'es', 'en', 'un', 'se', 'no', 'te', 'lo', 'le', 'da', 'su'],
+        'fr': ['le', 'de', 'et', 'à', 'un', 'il', 'être', 'en', 'avoir', 'que', 'pour', 'dans', 'ce', 'son', 'bonjour', 'monde', 'comment', 'vous', 'allez'],
+        'de': ['der', 'die', 'und', 'in', 'den', 'von', 'zu', 'das', 'mit', 'sich', 'des', 'auf', 'für', 'ist', 'im'],
+        'it': ['il', 'di', 'che', 'e', 'la', 'per', 'un', 'in', 'è', 'del', 'con', 'da', 'su', 'una', 'le'],
+        'pt': ['o', 'de', 'a', 'e', 'do', 'da', 'em', 'um', 'para', 'é', 'com', 'não', 'uma', 'os', 'no']
+    };
+    
+    const matches = {};
+    for (const [lang, langWords] of Object.entries(commonWords)) {
+        const found = words.filter(word => langWords.includes(word));
+        if (found.length > 0) {
+            matches[lang] = found;
+        }
+    }
+    
+    if (Object.keys(matches).length === 0) {
+        return 'No common words detected';
+    }
+    
+    return Object.entries(matches)
+        .map(([lang, words]) => `${lang.toUpperCase()}: ${words.join(', ')}`)
+        .join(' | ');
+}
+
+function calculateLanguageScores(text) {
+    const words = text.toLowerCase().split(/\s+/);
+    const scores = {};
+    
+    const languages = {
+        'en': { patterns: ['the', 'and', 'is', 'in', 'to', 'of', 'a', 'that', 'it', 'with'], chars: /[a-zA-Z]/ },
+        'es': { patterns: ['el', 'la', 'de', 'que', 'y', 'es', 'en', 'un', 'se', 'no'], chars: /[a-zA-ZñáéíóúüÑÁÉÍÓÚÜ]/ },
+        'fr': { patterns: ['le', 'de', 'et', 'à', 'un', 'il', 'être', 'en', 'avoir', 'que', 'comment', 'allez', 'vous'], chars: /[a-zA-ZàâäéèêëïîôöùûüÿçÀÂÄÉÈÊËÏÎÔÖÙÛÜŸÇ]/ },
+        'de': { patterns: ['der', 'die', 'und', 'in', 'den', 'von', 'zu', 'das', 'mit', 'sich'], chars: /[a-zA-ZäöüßÄÖÜ]/ },
+        'it': { patterns: ['il', 'di', 'che', 'e', 'la', 'per', 'un', 'in', 'è', 'del'], chars: /[a-zA-ZàéèìíîòóùúÀÉÈÌÍÎÒÓÙÚ]/ },
+        'pt': { patterns: ['o', 'de', 'a', 'e', 'do', 'da', 'em', 'um', 'para', 'é'], chars: /[a-zA-ZáàâãçéêíóôõúüÁÀÂÃÇÉÊÍÓÔÕÚÜ]/ }
+    };
+    
+    for (const [lang, data] of Object.entries(languages)) {
+        let score = 0;
+        
+        // Score based on common words
+        words.forEach(word => {
+            if (data.patterns.includes(word)) {
+                score += 3;
+            }
+        });
+        
+        // Score based on character patterns
+        const charMatches = text.match(data.chars);
+        if (charMatches) {
+            score += charMatches.length * 0.1;
+        }
+        
+        scores[lang] = Math.round(score);
+    }
+    
+    return Object.entries(scores)
+        .filter(([lang, score]) => score > 0)
+        .sort((a, b) => b[1] - a[1])
+        .map(([lang, score]) => `${lang.toUpperCase()}: ${score}`)
+        .join(', ');
 }
 
 // Tokenize text into words and punctuation

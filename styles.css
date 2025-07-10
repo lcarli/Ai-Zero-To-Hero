@@ -445,6 +445,34 @@ footer {
     transition: width 0.3s ease;
 }
 
+.detection-source {
+    margin-top: 0.5rem;
+}
+
+.detection-source small {
+    color: #666;
+    font-style: italic;
+}
+
+.example-box {
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.example-box strong {
+    color: #2c3e50;
+}
+
+.example-box em {
+    color: #666;
+    font-style: italic;
+}
+
 .tokens-container {
     display: flex;
     flex-wrap: wrap;
