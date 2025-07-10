@@ -1,0 +1,54 @@
+{
+  "languageDetection": {
+    "apis": [
+      {
+        "name": "LibreTranslate",
+        "url": "https://libretranslate.com/detect",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "bodyTemplate": {
+          "q": "{text}"
+        },
+        "responseFormat": {
+          "language": "language",
+          "confidence": "confidence"
+        },
+        "enabled": true,
+        "timeout": 5000
+      },
+      {
+        "name": "DetectLanguage",
+        "url": "https://ws.detectlanguage.com/0.2/detect",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "bodyTemplate": {
+          "q": "{text}"
+        },
+        "responseFormat": {
+          "language": "data.0.language",
+          "confidence": "data.0.confidence"
+        },
+        "enabled": false,
+        "timeout": 5000,
+        "requiresKey": true
+      }
+    ],
+    "fallback": {
+      "enabled": true,
+      "algorithm": "local"
+    },
+    "examples": {
+      "enabled": true,
+      "showSteps": true
+    }
+  },
+  "ui": {
+    "showApiSource": true,
+    "showFallbackInfo": true,
+    "animationDuration": 300
+  }
+}
