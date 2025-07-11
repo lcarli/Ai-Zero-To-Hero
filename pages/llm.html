@@ -48,63 +48,196 @@
                 <h2>What are Large Language Models?</h2>
                 <p>Large Language Models (LLMs) are advanced AI systems that use deep learning techniques to process and generate human language. They are trained on massive datasets of text from books, articles, websites, and other sources to learn patterns, context, and relationships in language.</p>
                 
-                <h2>Try It Yourself: How LLMs Process Text</h2>
-                <p>Enter any text in any language below to see how an LLM processes it step by step:</p>
+                <h2>Try It Yourself: Complete LLM Next Word Prediction Process</h2>
+                <p>Enter a sentence below and see the complete step-by-step process of how an LLM predicts the next word:</p>
                 
                 <div class="llm-demo">
                     <div class="input-section">
-                        <textarea id="user-input" placeholder="Enter text in any language (e.g., 'Hello world', 'Bonjour le monde', 'Hola mundo')..."></textarea>
-                        <button id="process-btn" class="cta-button">Analyze Text</button>
+                        <textarea id="user-input" placeholder="Enter an incomplete sentence (e.g., 'The weather today is', 'I love programming because', 'Artificial intelligence will')..."></textarea>
+                        <button id="process-btn" class="cta-button">Process with LLM</button>
                     </div>
                     
                     <div id="processing-results" class="processing-results" style="display: none;">
-                        <div class="processing-step">
-                            <h3 class="step-header" onclick="toggleCollapse('language-detection')">
-                                <span class="step-number">1</span>
-                                Language Detection
-                                <span class="collapse-indicator" id="language-detection-indicator">▼</span>
-                            </h3>
-                            <div id="language-detection" class="collapsible-content">
-                                <div class="algorithm-explanation">
-                                    <h4>Algorithm Used:</h4>
-                                    <p>Character frequency analysis combined with common word patterns:</p>
-                                    <ul>
-                                        <li>Analyze character frequency patterns</li>
-                                        <li>Check for language-specific characters (é, ñ, ü, etc.)</li>
-                                        <li>Match against common words in different languages</li>
-                                        <li>Calculate probability scores for each language</li>
-                                    </ul>
-                                </div>
-                                <div class="detection-result">
-                                    <h4>Detection Result:</h4>
-                                    <div id="language-result"></div>
-                                </div>
-                            </div>
-                        </div>
-                        
+                        <!-- Step 1: Tokenization -->
                         <div class="processing-step">
                             <h3 class="step-header" onclick="toggleCollapse('tokenization')">
-                                <span class="step-number">2</span>
-                                Tokenization
+                                <span class="step-number">1</span>
+                                Tokenization (Input Processing)
                                 <span class="collapse-indicator" id="tokenization-indicator">▼</span>
                             </h3>
                             <div id="tokenization" class="collapsible-content">
                                 <div class="algorithm-explanation">
-                                    <h4>Algorithm Used:</h4>
-                                    <p>Basic word-level tokenization:</p>
+                                    <h4>🔤 BPE Tokenization Process:</h4>
+                                    <p>Converting text into tokens that the model can understand:</p>
                                     <ul>
-                                        <li>Split text by whitespace and punctuation</li>
-                                        <li>Handle special characters and numbers</li>
-                                        <li>Create individual tokens for processing</li>
-                                        <li>Assign unique identifiers to each token</li>
+                                        <li><strong>Text → Subwords:</strong> Break down words into meaningful subunits</li>
+                                        <li><strong>Vocabulary Mapping:</strong> Each token gets a unique numerical ID</li>
+                                        <li><strong>Special Tokens:</strong> Add start/end markers for sequence processing</li>
                                     </ul>
                                 </div>
                                 <div class="tokenization-result">
-                                    <h4>Tokens Generated:</h4>
+                                    <h4>Token Sequence:</h4>
                                     <div id="tokens-container"></div>
                                     <div class="token-stats">
                                         <span id="token-count"></span>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 2: Embeddings -->
+                        <div class="processing-step">
+                            <h3 class="step-header" onclick="toggleCollapse('embeddings')">
+                                <span class="step-number">2</span>
+                                Token Embeddings & Positional Encoding
+                                <span class="collapse-indicator" id="embeddings-indicator">▼</span>
+                            </h3>
+                            <div id="embeddings" class="collapsible-content">
+                                <div class="algorithm-explanation">
+                                    <h4>🧮 Vector Representation Process:</h4>
+                                    <p>Converting tokens into high-dimensional vectors with position information:</p>
+                                    <ul>
+                                        <li><strong>Token Embeddings:</strong> Each token ID → dense vector (e.g., 768 dimensions)</li>
+                                        <li><strong>Positional Encoding:</strong> Add position information using sinusoidal patterns</li>
+                                        <li><strong>Combined Representation:</strong> Token meaning + position in sequence</li>
+                                    </ul>
+                                </div>
+                                <div class="embeddings-result">
+                                    <h4>Embedding Visualization:</h4>
+                                    <div id="embeddings-container"></div>
+                                    <div class="embeddings-stats">
+                                        <span id="embeddings-info"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Multi-Head Attention -->
+                        <div class="processing-step">
+                            <h3 class="step-header" onclick="toggleCollapse('attention')">
+                                <span class="step-number">3</span>
+                                Multi-Head Self-Attention
+                                <span class="collapse-indicator" id="attention-indicator">▼</span>
+                            </h3>
+                            <div id="attention" class="collapsible-content">
+                                <div class="algorithm-explanation">
+                                    <h4>👁️ Attention Mechanism:</h4>
+                                    <p>How the model relates different words in the sentence:</p>
+                                    <ul>
+                                        <li><strong>Query, Key, Value:</strong> Transform each token into Q, K, V vectors</li>
+                                        <li><strong>Attention Scores:</strong> Calculate relevance between all token pairs</li>
+                                        <li><strong>Multi-Head:</strong> Run 12+ attention heads in parallel</li>
+                                        <li><strong>Context Integration:</strong> Combine information from related tokens</li>
+                                    </ul>
+                                </div>
+                                <div class="attention-result">
+                                    <h4>Attention Patterns:</h4>
+                                    <div id="attention-matrix"></div>
+                                    <div class="attention-controls">
+                                        <label>Select attention head: 
+                                            <select id="attention-head-select">
+                                                <option value="0">Head 1</option>
+                                                <option value="1">Head 2</option>
+                                                <option value="2">Head 3</option>
+                                                <option value="3">Head 4</option>
+                                            </select>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 4: Feed Forward Network -->
+                        <div class="processing-step">
+                            <h3 class="step-header" onclick="toggleCollapse('feedforward')">
+                                <span class="step-number">4</span>
+                                Feed Forward Network
+                                <span class="collapse-indicator" id="feedforward-indicator">▼</span>
+                            </h3>
+                            <div id="feedforward" class="collapsible-content">
+                                <div class="algorithm-explanation">
+                                    <h4>🧠 Neural Network Processing:</h4>
+                                    <p>Deep processing of attended representations:</p>
+                                    <ul>
+                                        <li><strong>Linear Transformation:</strong> Project to higher dimension (e.g., 768 → 3072)</li>
+                                        <li><strong>GELU Activation:</strong> Non-linear transformation for complex patterns</li>
+                                        <li><strong>Output Projection:</strong> Project back to original dimension</li>
+                                        <li><strong>Residual Connection:</strong> Add input to prevent vanishing gradients</li>
+                                    </ul>
+                                </div>
+                                <div class="feedforward-result">
+                                    <h4>Network Activations:</h4>
+                                    <div id="feedforward-visualization"></div>
+                                    <div id="feedforward-stats"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 5: Layer Stacking -->
+                        <div class="processing-step">
+                            <h3 class="step-header" onclick="toggleCollapse('layers')">
+                                <span class="step-number">5</span>
+                                Layer Stacking (Transformer Blocks)
+                                <span class="collapse-indicator" id="layers-indicator">▼</span>
+                            </h3>
+                            <div id="layers" class="collapsible-content">
+                                <div class="algorithm-explanation">
+                                    <h4>🏗️ Deep Architecture Processing:</h4>
+                                    <p>Multiple transformer layers for complex understanding:</p>
+                                    <ul>
+                                        <li><strong>Layer 1-4:</strong> Basic pattern recognition and syntax</li>
+                                        <li><strong>Layer 5-8:</strong> Semantic understanding and relationships</li>
+                                        <li><strong>Layer 9-12:</strong> High-level reasoning and context integration</li>
+                                        <li><strong>Residual Flow:</strong> Information preservation across layers</li>
+                                    </ul>
+                                </div>
+                                <div class="layers-result">
+                                    <h4>Layer-by-Layer Processing:</h4>
+                                    <div id="layers-visualization"></div>
+                                    <div class="layer-controls">
+                                        <label>Select layer to analyze: 
+                                            <select id="layer-select">
+                                                <option value="0">Layer 1 (Surface)</option>
+                                                <option value="3">Layer 4 (Syntax)</option>
+                                                <option value="6">Layer 7 (Semantics)</option>
+                                                <option value="9">Layer 10 (Reasoning)</option>
+                                                <option value="11">Layer 12 (Final)</option>
+                                            </select>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 6: Output Head & Next Word Prediction -->
+                        <div class="processing-step">
+                            <h3 class="step-header" onclick="toggleCollapse('prediction')">
+                                <span class="step-number">6</span>
+                                Next Word Prediction
+                                <span class="collapse-indicator" id="prediction-indicator">▼</span>
+                            </h3>
+                            <div id="prediction" class="collapsible-content">
+                                <div class="algorithm-explanation">
+                                    <h4>🎯 Final Prediction Process:</h4>
+                                    <p>Converting final hidden states to word probabilities:</p>
+                                    <ul>
+                                        <li><strong>Linear Projection:</strong> Map final hidden state to vocabulary size</li>
+                                        <li><strong>Softmax Normalization:</strong> Convert logits to probabilities</li>
+                                        <li><strong>Temperature Scaling:</strong> Control randomness vs. determinism</li>
+                                        <li><strong>Top-K Sampling:</strong> Select from most likely candidates</li>
+                                    </ul>
+                                </div>
+                                <div class="prediction-result">
+                                    <h4>🏆 Top Predictions:</h4>
+                                    <div id="predictions-ranking"></div>
+                                    <div class="prediction-controls">
+                                        <label>Temperature: 
+                                            <input type="range" id="temperature-slider" min="0.1" max="2.0" step="0.1" value="1.0">
+                                            <span id="temperature-value">1.0</span>
+                                        </label>
+                                        <button id="generate-next" class="cta-button">Generate Next Word</button>
+                                    </div>
+                                    <div id="generated-sequence"></div>
                                 </div>
                             </div>
                         </div>
