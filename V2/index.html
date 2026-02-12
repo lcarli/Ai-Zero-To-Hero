@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIFORALL — AI Zero to Hero</title>
+  <meta name="description" content="Learn AI interactively — from tokens to transformers, with live demos and gamification.">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+
+  <!-- ======== Navbar ======== -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a href="#/" class="nav-logo">
+        🤖 <span>AIFORALL</span>
+      </a>
+
+      <ul class="nav-links" id="nav-links">
+        <li><a href="#/" data-route="/">🏠 Home</a></li>
+        <li><a href="#/tokenization" data-route="/tokenization">🧩 Tokens</a></li>
+        <li><a href="#/embeddings" data-route="/embeddings">📐 Embeddings</a></li>
+        <li><a href="#/attention" data-route="/attention">🎯 Attention</a></li>
+        <li><a href="#/llm" data-route="/llm">🤖 LLM</a></li>
+        <li><a href="#/lstm" data-route="/lstm">🔄 LSTM</a></li>
+        <li><a href="#/vision" data-route="/vision">👁️ Vision</a></li>
+        <li><a href="#/prompt-engineering" data-route="/prompt-engineering">✍️ Prompts</a></li>
+        <li><a href="#/rag" data-route="/rag">📚 RAG</a></li>
+        <li><a href="#/agents" data-route="/agents">🤝 Agents</a></li>
+        <li><a href="#/settings" data-route="/settings">⚙️ Config</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <div class="nav-xp" id="nav-xp" title="Experience Points">
+          ⚡ <span id="xp-display">0</span> XP
+        </div>
+        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">🌙</button>
+        <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ======== Toast Container ======== -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- ======== Main App ======== -->
+  <div id="app" style="padding-top: 64px;">
+    <!-- Pages rendered here by router -->
+  </div>
+
+  <!-- ======== Scripts ======== -->
+  <script src="js/ui/animations.js"></script>
+  <script src="js/ui/particles.js"></script>
+  <script src="js/gamification/progress.js"></script>
+  <script src="js/gamification/achievements.js"></script>
+
+  <!-- Engines -->
+  <script src="js/engine/tokenizer.js"></script>
+  <script src="js/engine/embeddings.js"></script>
+  <script src="js/engine/attention.js"></script>
+  <script src="js/engine/llm.js"></script>
+  <script src="js/engine/lstm.js"></script>
+  <script src="js/engine/vision.js"></script>
+  <script src="js/engine/prompt.js"></script>
+  <script src="js/engine/rag.js"></script>
+  <script src="js/engine/agents.js"></script>
+  <script src="js/engine/foundry.js"></script>
+  <script src="config.local.js" onerror=""></script>
+
+  <!-- Demos -->
+  <script src="js/demos/tokenization-demo.js"></script>
+  <script src="js/demos/embeddings-demo.js"></script>
+  <script src="js/demos/attention-demo.js"></script>
+  <script src="js/demos/llm-demo.js"></script>
+  <script src="js/demos/lstm-demo.js"></script>
+  <script src="js/demos/vision-demo.js"></script>
+  <script src="js/demos/prompt-demo.js"></script>
+  <script src="js/demos/rag-demo.js"></script>
+  <script src="js/demos/agents-demo.js"></script>
+  <script src="js/demos/config-page.js"></script>
+
+  <!-- App (must be last) -->
+  <script src="js/app.js"></script>
+</body>
+</html>

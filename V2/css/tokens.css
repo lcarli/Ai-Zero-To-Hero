@@ -1,0 +1,130 @@
+/* ============================================
+   AIFORALL V2 — Design Tokens
+   Variáveis CSS globais do projeto
+   ============================================ */
+
+:root {
+  /* ---- Cores: Dark Mode (padrão) ---- */
+  --bg:             #0a0a0f;
+  --bg-surface:     #13131a;
+  --bg-elevated:    #1a1a25;
+  --border:         #1e1e2e;
+  --border-subtle:  #16161f;
+
+  --primary:        #6366f1;
+  --primary-hover:  #818cf8;
+  --primary-glow:   rgba(99, 102, 241, 0.25);
+
+  --secondary:      #06b6d4;
+  --secondary-hover:#22d3ee;
+  --secondary-glow: rgba(6, 182, 212, 0.25);
+
+  --accent:         #f59e0b;
+  --accent-hover:   #fbbf24;
+  --accent-glow:    rgba(245, 158, 11, 0.25);
+
+  --success:        #10b981;
+  --success-hover:  #34d399;
+  --error:          #ef4444;
+  --error-hover:    #f87171;
+  --warning:        #f59e0b;
+
+  --text:           #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted:     #64748b;
+  --text-inverse:   #0a0a0f;
+
+  /* ---- Cores: Light Mode ---- */
+  --bg-light:             #f8fafc;
+  --bg-surface-light:     #ffffff;
+  --bg-elevated-light:    #f1f5f9;
+  --border-light:         #e2e8f0;
+  --text-light:           #1e293b;
+  --text-secondary-light: #475569;
+  --text-muted-light:     #94a3b8;
+
+  /* ---- Tipografia ---- */
+  --font-sans:  'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono:  'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  --text-xs:    0.75rem;    /* 12px */
+  --text-sm:    0.875rem;   /* 14px */
+  --text-base:  1rem;       /* 16px */
+  --text-lg:    1.125rem;   /* 18px */
+  --text-xl:    1.25rem;    /* 20px */
+  --text-2xl:   1.5rem;     /* 24px */
+  --text-3xl:   1.875rem;   /* 30px */
+  --text-4xl:   2.25rem;    /* 36px */
+  --text-5xl:   3rem;       /* 48px */
+
+  --leading-tight:  1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed:1.75;
+
+  --weight-normal:  400;
+  --weight-medium:  500;
+  --weight-semibold:600;
+  --weight-bold:    700;
+
+  /* ---- Espaçamento ---- */
+  --space-1:  0.25rem;   /* 4px  */
+  --space-2:  0.5rem;    /* 8px  */
+  --space-3:  0.75rem;   /* 12px */
+  --space-4:  1rem;      /* 16px */
+  --space-5:  1.25rem;   /* 20px */
+  --space-6:  1.5rem;    /* 24px */
+  --space-8:  2rem;      /* 32px */
+  --space-10: 2.5rem;    /* 40px */
+  --space-12: 3rem;      /* 48px */
+  --space-16: 4rem;      /* 64px */
+  --space-20: 5rem;      /* 80px */
+  --space-24: 6rem;      /* 96px */
+
+  /* ---- Bordas ---- */
+  --radius-sm:   0.375rem;  /* 6px  */
+  --radius-md:   0.5rem;    /* 8px  */
+  --radius-lg:   0.75rem;   /* 12px */
+  --radius-xl:   1rem;      /* 16px */
+  --radius-2xl:  1.5rem;    /* 24px */
+  --radius-full: 9999px;
+
+  /* ---- Sombras ---- */
+  --shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md:  0 4px 6px rgba(0, 0, 0, 0.3);
+  --shadow-lg:  0 10px 15px rgba(0, 0, 0, 0.3);
+  --shadow-xl:  0 20px 25px rgba(0, 0, 0, 0.3);
+  --shadow-glow:0 0 20px var(--primary-glow);
+
+  /* ---- Transições ---- */
+  --transition-fast:   150ms ease-out;
+  --transition-base:   200ms ease-out;
+  --transition-slow:   300ms ease-out;
+  --transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ---- Z-index ---- */
+  --z-base:     1;
+  --z-dropdown: 10;
+  --z-sticky:   20;
+  --z-overlay:  30;
+  --z-modal:    40;
+  --z-toast:    50;
+
+  /* ---- Layout ---- */
+  --max-width:  1200px;
+  --sidebar-w:  280px;
+}
+
+/* ---- Light Mode Override ---- */
+[data-theme="light"] {
+  --bg:             var(--bg-light);
+  --bg-surface:     var(--bg-surface-light);
+  --bg-elevated:    var(--bg-elevated-light);
+  --border:         var(--border-light);
+  --text:           var(--text-light);
+  --text-secondary: var(--text-secondary-light);
+  --text-muted:     var(--text-muted-light);
+  --shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md:  0 4px 6px rgba(0, 0, 0, 0.07);
+  --shadow-lg:  0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-xl:  0 20px 25px rgba(0, 0, 0, 0.1);
+}

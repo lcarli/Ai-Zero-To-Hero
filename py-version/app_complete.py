@@ -16,7 +16,7 @@ from typing import Dict, List, Any
 import json
 
 # Import our custom modules
-from src.tokenization import BPETokenizer, create_sample_tokenizer
+from src.tokenization import BPETokenizer, create_sample_tokenizer, create_dynamic_tokenizer
 from src.embeddings import create_sample_embedding_layer
 from src.attention import create_sample_attention_layer, AttentionVisualizer
 from src.feedforward import create_sample_feedforward_layer
@@ -261,7 +261,7 @@ def process_step_1_tokenization(text_input, config):
     """, unsafe_allow_html=True)
     
     # Create tokenizer and process text
-    tokenizer = create_sample_tokenizer(vocab_size=config['vocab_size'])
+    tokenizer = create_dynamic_tokenizer(text_input, vocab_size=config['vocab_size'])
     tokens = tokenizer.encode(text_input)
     tokens_info = tokenizer.visualize_tokenization(text_input)
     
@@ -269,14 +269,154 @@ def process_step_1_tokenization(text_input, config):
     st.write("**Original Text:**")
     st.code(text_input)
     
-    # Display tokens
-    st.write("**Tokens:**")
-    token_html = ""
-    for i, token in enumerate(tokens):
-        token_html += f'<span class="token-box">{token}</span>'
-        if (i + 1) % 8 == 0:  # New line every 8 tokens
-            token_html += "<br>"
-    st.markdown(token_html, unsafe_allow_html=True)
+    # Explanation of what happens next
+    st.info("""
+    💡 **What's happening:** The tokenizer was trained specifically on your text plus common words. 
+    Each piece of your text gets assigned a unique number (token ID). 
+    These numbers are what the AI actually "sees" and processes!
+    """)
+    
+    # Display token mapping
+    st.write("**🔗 Text → Token Mapping:**")
+    
+    # Color coding for different token types
+    colors = {
+        'special': '#ff6b6b',
+        'character': '#4ecdc4', 
+        'subword': '#45b7d1',
+        'word': '#96ceb4'
+    }
+    
+    st.write("How your text is broken down:")
+    
+    # Filter out special tokens for display
+    visible_tokens = [info for info in tokens_info if info['token_type'] != 'special']
+    
+    if visible_tokens:
+        # Create a container for better control
+        with st.container():
+            # Display tokens in rows of 6 for better readability
+            tokens_per_row = 6
+            
+            for row_start in range(0, len(visible_tokens), tokens_per_row):
+                row_tokens = visible_tokens[row_start:row_start + tokens_per_row]
+                cols = st.columns(len(row_tokens))
+                
+                for i, info in enumerate(row_tokens):
+                    with cols[i]:
+                        token_text = info['token_text']
+                        token_id = info['token_id']
+                        token_type = info['token_type']
+                        color = colors.get(token_type, '#95a5a6')
+                        
+                        # Compact token display
+                        st.markdown(f"""
+                        <div style="
+                            border: 2px solid {color}; 
+                            border-radius: 8px; 
+                            padding: 8px; 
+                            margin: 4px 0; 
+                            text-align: center;
+                            min-height: 80px;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: space-between;
+                        ">
+                            <div style="
+                                background-color: {color}; 
+                                color: white; 
+                                padding: 4px; 
+                                border-radius: 4px; 
+                                font-weight: bold; 
+                                font-size: 16px;
+                                margin: -4px -4px 4px -4px;
+                            ">
+                                {token_id}
+                            </div>
+                            <div style="
+                                font-size: 14px; 
+                                word-break: break-word;
+                                flex-grow: 1;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                            ">
+                                "{token_text}"
+                            </div>
+                            <div style="
+                                font-size: 10px; 
+                                color: #666; 
+                                background-color: #f8f9fa;
+                                padding: 2px;
+                                border-radius: 2px;
+                                margin: 4px -4px -4px -4px;
+                            ">
+                                {token_type}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+    
+    # Improved legend
+    st.markdown("**Token Type Legend:**")
+    
+    legend_items = [
+        ('character', '🔤 Character/Letter'),
+        ('subword', '🔸 Subword/Part'),
+        ('word', '📝 Complete Word')
+    ]
+    
+    # Create a horizontal legend with better spacing
+    legend_container = st.container()
+    with legend_container:
+        st.markdown("""
+        <div style="
+            display: flex; 
+            justify-content: space-around; 
+            align-items: center;
+            background-color: #f0f2f6;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border: 1px solid #e1e5e9;
+        ">
+        """, unsafe_allow_html=True)
+        
+        for token_type, label in legend_items:
+            color = colors[token_type]
+            st.markdown(f"""
+            <div style="
+                display: flex; 
+                align-items: center; 
+                gap: 8px;
+                padding: 8px 12px;
+                border-radius: 6px;
+                background-color: white;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                margin: 0 5px;
+                min-width: 150px;
+                justify-content: center;
+            ">
+                <div style="
+                    width: 20px; 
+                    height: 20px; 
+                    background-color: {color}; 
+                    border-radius: 4px;
+                    border: 1px solid rgba(0,0,0,0.1);
+                "></div>
+                <span style="
+                    font-size: 14px; 
+                    font-weight: 500;
+                    color: #262730;
+                ">{label}</span>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Show token sequence
+    st.write("**📝 Complete Token Sequence (including special tokens):**")
+    sequence_tokens = [str(token_id) for token_id in tokens]
+    st.code(f"[{', '.join(sequence_tokens)}]")
     
     # Token statistics
     col1, col2, col3 = st.columns(3)

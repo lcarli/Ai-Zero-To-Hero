@@ -331,6 +331,38 @@ def create_sample_tokenizer(vocab_size: int = 1000) -> BPETokenizer:
     return tokenizer
 
 
+def create_dynamic_tokenizer(user_text: str, vocab_size: int = 1000) -> BPETokenizer:
+    """
+    Create a tokenizer that adapts to the user's input text.
+    
+    Args:
+        user_text: The user's input text to include in training
+        vocab_size: Maximum vocabulary size for the tokenizer
+    
+    Returns:
+        Trained BPE tokenizer adapted to the user's text
+    """
+    # Base training text for common words and patterns
+    base_text = """
+    the and is are was were will be been being have has had do does did
+    can could would should might must may shall will would
+    I you he she it we they me him her us them my your his her its our their
+    this that these those a an some any all each every
+    in on at by for with from to of about through during before after
+    what when where why how who which whose whom
+    """
+    
+    # Combine base text with user input (give more weight to user text)
+    combined_text = f"{base_text} {user_text} {user_text} {user_text}"
+    
+    print(f"🚀 Training dynamic tokenizer for: '{user_text[:50]}{'...' if len(user_text) > 50 else ''}'")
+    
+    tokenizer = BPETokenizer(vocab_size=vocab_size)
+    tokenizer.train(combined_text)
+    
+    return tokenizer
+
+
 if __name__ == "__main__":
     # Example usage
     tokenizer = create_sample_tokenizer()
