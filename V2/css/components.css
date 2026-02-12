@@ -540,6 +540,18 @@
   gap: var(--space-1);
   border-bottom: 1px solid var(--border);
   margin-bottom: var(--space-6);
+  position: sticky;
+  top: 64px;
+  background: var(--bg);
+  z-index: calc(var(--z-sticky) - 1);
+  padding-top: var(--space-2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tab-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .tab {
@@ -552,6 +564,8 @@
   border-bottom: 2px solid transparent;
   cursor: pointer;
   transition: all var(--transition-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tab:hover {
@@ -806,15 +820,17 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .module-header {
   display: flex;
   align-items: center;
-  gap: var(--space-6);
-  margin-bottom: var(--space-8);
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
 }
 
 .module-header h1 {
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
+  font-size: var(--text-2xl);
 }
 .module-header p {
   margin: 0;
+  font-size: var(--text-sm);
 }
 
 /* ---- Tab Content ---- */
@@ -1099,14 +1115,25 @@ input[type="range"]::-webkit-slider-thumb:hover {
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  margin-bottom: var(--space-8);
+  margin-bottom: var(--space-4);
 }
 .module-header h1 {
   margin: 0;
+  font-size: var(--text-2xl);
 }
 .module-header p {
   margin: 0;
   color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* ---- Module Page layout ---- */
+.module-page .section {
+  padding-top: var(--space-8);
+  padding-bottom: var(--space-8);
+}
+.module-page {
+  scroll-behavior: smooth;
 }
 
 /* ---- Analogy presets ---- */
@@ -1370,6 +1397,29 @@ input[type="range"]::-webkit-slider-thumb:hover {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1rem;
+  max-height: 420px;
+  overflow-y: hidden;
+  position: relative;
+  transition: max-height 0.4s ease;
+}
+.llm-steps-grid::after {
+  content: '';
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(transparent, var(--bg));
+  pointer-events: none;
+  display: block;
+  grid-column: 1 / -1;
+}
+.llm-steps-grid.expanded {
+  max-height: 3000px;
+  overflow-y: visible;
+}
+.llm-steps-grid.expanded::after {
+  display: none;
 }
 .llm-step-ref-card {
   display: flex;

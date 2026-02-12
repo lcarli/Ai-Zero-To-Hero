@@ -564,6 +564,12 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
+    // Scroll content area to right below tab-bar so user sees the new tab content
+    const tabBarRect = tabBar.getBoundingClientRect();
+    const navHeight = 64; // fixed navbar height
+    const scrollTarget = window.scrollY + tabBarRect.top - navHeight;
+    window.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+
     // Resize canvas when switching to space tab (embeddings)
     if (tabName === 'space' && typeof EmbeddingsDemo !== 'undefined' && EmbeddingsDemo.resizeCanvas) {
       requestAnimationFrame(() => EmbeddingsDemo.resizeCanvas());

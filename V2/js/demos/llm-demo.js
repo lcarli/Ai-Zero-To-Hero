@@ -15,12 +15,12 @@ const LLMDemo = (() => {
 
     return `
       <div class="page module-page">
-        <section class="section">
+        <section class="section" style="padding-top: var(--space-8);">
           <div class="container">
-            <a href="#/" class="btn btn-ghost mb-8">← Voltar à trilha</a>
+            <a href="#/" class="btn btn-ghost btn-sm mb-4" style="font-size: 0.8rem;">← Voltar à trilha</a>
 
             <div class="module-header">
-              <span style="font-size: 3rem;">🤖</span>
+              <span style="font-size: 2.2rem;">🤖</span>
               <div>
                 <h1>Large Language Models</h1>
                 <p>O pipeline completo: de texto a previsão do próximo token</p>
@@ -163,8 +163,13 @@ const LLMDemo = (() => {
         </div>
 
         <!-- Step reference cards -->
-        <h3 class="mb-4 mt-8">📋 Etapas do Pipeline LLM</h3>
-        <div class="llm-steps-grid">
+        <div class="flex items-center justify-between mb-4 mt-8">
+          <h3 style="margin:0;">📋 Etapas do Pipeline LLM</h3>
+          <button class="btn btn-ghost btn-sm" id="llm-toggle-steps" style="font-size:0.8rem;">
+            ▼ Expandir/Recolher
+          </button>
+        </div>
+        <div class="llm-steps-grid" id="llm-steps-grid">
           ${steps.map((s, i) => `
             <div class="card-flat llm-step-ref-card" id="llm-ref-card-${i}">
               <div class="llm-step-num">${i + 1}</div>
@@ -416,6 +421,19 @@ const LLMDemo = (() => {
     document.getElementById('pipeline-run-btn')?.addEventListener('click', startPipeline);
     document.getElementById('pipeline-reset-btn')?.addEventListener('click', resetPipeline);
     document.getElementById('llm-next-step-btn')?.addEventListener('click', advancePipelineStep);
+
+    // Toggle steps grid expand/collapse
+    document.getElementById('llm-toggle-steps')?.addEventListener('click', () => {
+      const grid = document.getElementById('llm-steps-grid');
+      if (!grid) return;
+      grid.classList.toggle('expanded');
+      const btn = document.getElementById('llm-toggle-steps');
+      if (grid.classList.contains('expanded')) {
+        btn.textContent = '▲ Recolher';
+      } else {
+        btn.textContent = '▼ Expandir';
+      }
+    });
 
     // Real pipeline
     document.getElementById('pipeline-real-btn')?.addEventListener('click', runRealPipeline);

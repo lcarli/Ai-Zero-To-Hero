@@ -1,1 +1,5 @@
 config.local.js
+
+# Playwright MCP screenshots
+.playwright-screenshots/
+.playwright-mcp/
