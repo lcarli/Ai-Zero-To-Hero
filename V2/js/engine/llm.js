@@ -255,6 +255,177 @@ const LLMEngine = (() => {
     { name: 'Gemini Ultra',  params: '~?',    layers: '~?', dModel: '~?', heads: '~?', vocab: '~256K', year: 2024 },
   ];
 
+  /* ============ LLM Pipeline Steps (step-by-step interactive) ============ */
+
+  const LLM_PIPELINE_STEPS = [
+    {
+      id: 'input',
+      title: 'Texto de Entrada',
+      desc: 'O texto bruto entra no modelo como uma string de caracteres.',
+      icon: '📝',
+      detail: 'Antes de qualquer processamento, o modelo recebe uma sequência de caracteres Unicode. Esta string será decomposta em unidades menores (tokens) na próxima etapa.',
+    },
+    {
+      id: 'tokenize',
+      title: 'Tokenização (BPE)',
+      desc: 'O texto é dividido em sub-palavras via Byte-Pair Encoding.',
+      icon: '🧩',
+      detail: 'BPE (Byte-Pair Encoding) é um algoritmo que divide o texto em pedaços frequentes. "unhappiness" → ["un", "happi", "ness"]. O vocabulário típico tem 50K-100K tokens.',
+    },
+    {
+      id: 'embedding',
+      title: 'Embedding Lookup',
+      desc: 'Cada token ID é mapeado para um vetor denso de alta dimensão.',
+      icon: '📐',
+      detail: 'Uma tabela de embedding (vocab_size × d_model) converte cada ID numérico em um vetor de 12.288 dimensões (GPT-3). Tokens semanticamente similares ficam próximos neste espaço vetorial.',
+    },
+    {
+      id: 'positional',
+      title: 'Positional Encoding',
+      desc: 'Informação de posição é adicionada a cada embedding.',
+      icon: '📍',
+      detail: 'Como o Transformer processa todos os tokens em paralelo (sem recorrência), usamos Positional Encoding para injetar a ordem. PE(pos,2i) = sin(pos/10000^(2i/d)), PE(pos,2i+1) = cos(pos/10000^(2i/d)).',
+    },
+    {
+      id: 'attention',
+      title: 'Multi-Head Self-Attention',
+      desc: 'Cada token "olha" para todos os outros para capturar contexto.',
+      icon: '👁️',
+      detail: 'Q, K, V são projeções lineares do input. Attention(Q,K,V) = softmax(QK^T / √d_k) × V. Com 96 cabeças em paralelo (GPT-3), cada uma captura relações diferentes.',
+    },
+    {
+      id: 'addnorm1',
+      title: 'Residual + LayerNorm',
+      desc: 'Conexão residual preserva informação, LayerNorm estabiliza.',
+      icon: '➕',
+      detail: 'output = LayerNorm(x + Attention(x)). A conexão residual permite que gradientes fluam direto pelas camadas. LayerNorm normaliza para média 0 e variância 1 por token.',
+    },
+    {
+      id: 'ffn',
+      title: 'Feed-Forward Network',
+      desc: 'Duas camadas lineares com ativação GELU processam cada posição.',
+      icon: '🧠',
+      detail: 'FFN(x) = GELU(x·W₁ + b₁)·W₂ + b₂. A dimensão interna expande 4× (12.288 → 49.152 → 12.288 no GPT-3). É aqui que o modelo armazena grande parte do "conhecimento".',
+    },
+    {
+      id: 'layers',
+      title: 'N× Camadas Empilhadas',
+      desc: 'O bloco Attention + FFN se repete N vezes (96× no GPT-3).',
+      icon: '🔄',
+      detail: 'Cada camada refina progressivamente a representação. Camadas iniciais capturam sintaxe, camadas intermediárias semântica, camadas finais raciocínio e predição. A representação é refinada a cada passagem.',
+    },
+    {
+      id: 'linear',
+      title: 'Projeção para Vocabulário',
+      desc: 'O vetor do último token é projetado para o vocabulário inteiro.',
+      icon: '📊',
+      detail: 'Uma camada linear (d_model × vocab_size) transforma o vetor de 12.288 dimensões em 50.257 logits — um score bruto para cada token possível do vocabulário.',
+    },
+    {
+      id: 'softmax',
+      title: 'Softmax + Sampling',
+      desc: 'Logits viram probabilidades e um token é amostrado.',
+      icon: '🎯',
+      detail: 'Softmax(z_i) = e^(z_i) / Σ e^(z_j) converte logits em probabilidades. Depois, Temperature, Top-K e Top-P filtram a distribuição antes da amostragem aleatória final.',
+    },
+  ];
+
+  /**
+   * Generate per-step data for a given input text.
+   * Returns an array of data objects, one per step, for rich visualization.
+   */
+  function generatePipelineStepData(inputText) {
+    const tokens = inputText.trim().split(/\s+/);
+    const lastToken = tokens[tokens.length - 1];
+    const { candidates } = getNextWordProbs(lastToken);
+
+    // Simulate BPE sub-tokenization
+    const bpeTokens = [];
+    tokens.forEach(word => {
+      if (word.length <= 3) {
+        bpeTokens.push({ surface: word, id: (hashStr(word) % 50000) + 100 });
+      } else {
+        // Split longer words into "sub-tokens"
+        const mid = Math.ceil(word.length * 0.6);
+        bpeTokens.push({ surface: word.slice(0, mid), id: (hashStr(word.slice(0, mid)) % 50000) + 100 });
+        bpeTokens.push({ surface: word.slice(mid), id: (hashStr(word.slice(mid)) % 50000) + 100, isContinuation: true });
+      }
+    });
+
+    // Generate fake 12-dim embeddings for display
+    const embeddings = bpeTokens.map((t, i) => ({
+      token: t.surface,
+      vec: Array.from({ length: 12 }, (_, d) => {
+        const seed = hashStr(t.surface + d);
+        return ((seed % 2000) - 1000) / 1000;
+      }),
+    }));
+
+    // Positional encodings
+    const posEncodings = bpeTokens.map((_, pos) =>
+      Array.from({ length: 12 }, (_, i) => {
+        const div = Math.pow(10000, (2 * Math.floor(i / 2)) / 12);
+        return i % 2 === 0 ? Math.sin(pos / div) : Math.cos(pos / div);
+      })
+    );
+
+    // Attention scores (simulated)
+    const n = Math.min(bpeTokens.length, 8);
+    const attnScores = [];
+    for (let i = 0; i < n; i++) {
+      const row = [];
+      for (let j = 0; j < n; j++) {
+        // Causal mask: can only attend to j <= i
+        if (j > i) { row.push(0); continue; }
+        const base = j === i ? 0.35 : (j === i - 1 ? 0.2 : 0.08);
+        row.push(base + Math.random() * 0.08);
+      }
+      // Normalize row
+      const sum = row.reduce((s, v) => s + v, 0);
+      for (let j = 0; j < n; j++) row[j] = sum > 0 ? row[j] / sum : 0;
+      attnScores.push(row);
+    }
+
+    // Layer activations (simulated variance progression through layers)
+    const numLayers = 96;
+    const layerActivations = [1, 4, 12, 24, 48, 72, 88, 96].map(l => ({
+      layer: l,
+      variance: 0.9 * Math.exp(-0.01 * l) + 0.1 + Math.random() * 0.05,
+      syntaxPct: Math.max(0, 90 - l * 1.2 + Math.random() * 5),
+      semanticPct: Math.min(95, 20 + l * 0.8 + Math.random() * 5),
+    }));
+
+    // Logits → top candidates
+    const logits = candidates.slice(0, 8).map(c => ({
+      token: c.word,
+      logit: Math.log(c.prob + 0.001) * 3 + Math.random() * 0.5,
+      prob: c.prob,
+    }));
+
+    return {
+      input: inputText,
+      bpeTokens,
+      embeddings,
+      posEncodings,
+      attnScores,
+      attnTokens: bpeTokens.slice(0, n).map(t => t.surface),
+      layerActivations,
+      logits,
+      candidates,
+      totalLayers: numLayers,
+    };
+  }
+
+  /** Simple deterministic hash for strings */
+  function hashStr(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+      h = ((h << 5) - h) + s.charCodeAt(i);
+      h |= 0;
+    }
+    return Math.abs(h);
+  }
+
   return {
     getNextWordProbs,
     sampleWithTemperature,
@@ -263,5 +434,7 @@ const LLMEngine = (() => {
     simulatePipeline,
     generateSequence,
     MODEL_SIZES,
+    LLM_PIPELINE_STEPS,
+    generatePipelineStepData,
   };
 })();

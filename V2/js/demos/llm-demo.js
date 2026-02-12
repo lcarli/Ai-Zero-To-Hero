@@ -120,20 +120,75 @@ const LLMDemo = (() => {
 
   function renderPipelineTab() {
     const aiReady = typeof FoundryService !== 'undefined' && FoundryService.isConfigured();
+    const steps = LLMEngine.LLM_PIPELINE_STEPS;
     return `
       <div class="pipeline-section">
         <div class="card-flat mb-4">
-          <h3>🔄 Visualize o Pipeline</h3>
-          <p class="text-sm text-muted">Digite um texto e veja cada estágio do processamento.</p>
+          <h3>🔄 Pipeline Passo a Passo</h3>
+          <p class="text-sm text-muted">Digite um texto e percorra cada etapa do processamento de um LLM.</p>
           <div class="flex gap-4 items-center mt-4 flex-wrap">
-            <input id="pipeline-input" class="input" value="The cat sat on" 
+            <input id="pipeline-input" class="input" value="The cat sat on"
               placeholder="Digite um texto..." style="flex:1;min-width:200px;">
-            <button class="btn btn-primary" id="pipeline-run-btn">Processar</button>
+            <button class="btn btn-primary" id="pipeline-run-btn">🚀 Iniciar Pipeline</button>
+            <button class="btn btn-ghost" id="pipeline-reset-btn" style="display:none;">🔄 Reset</button>
+          </div>
+          <div class="llm-step-controls mt-4" id="llm-step-controls" style="display:none;">
+            <button class="btn btn-primary" id="llm-next-step-btn">Próximo Passo →</button>
+            <span class="llm-step-counter text-sm text-muted" id="llm-step-counter">Passo 0 / ${steps.length}</span>
+          </div>
+        </div>
+
+        <!-- Data flow visualizer -->
+        <div id="llm-pipeline-flow-state" class="llm-pipeline-flow-state" style="display:none;">
+          <div class="llm-flow-nodes">
+            ${steps.map((s, i) => `
+              <div class="llm-flow-node" id="llm-flow-node-${i}" data-step="${i}">
+                <span class="llm-flow-icon">${s.icon}</span>
+                <span class="llm-flow-label">${s.title.split(' ')[0]}</span>
+              </div>
+              ${i < steps.length - 1 ? '<span class="llm-flow-arrow">→</span>' : ''}
+            `).join('')}
+          </div>
+          <div class="llm-flow-progress-wrap">
+            <div class="llm-flow-progress" id="llm-flow-progress" style="width:0%"></div>
+          </div>
+        </div>
+
+        <!-- Step info panel -->
+        <div id="llm-step-panel" class="card-flat mt-4" style="display:none;">
+          <h4 id="llm-step-title"></h4>
+          <p id="llm-step-desc"></p>
+          <p id="llm-step-detail" class="text-sm text-muted mt-2"></p>
+          <div id="llm-step-viz" class="llm-step-viz"></div>
+        </div>
+
+        <!-- Step reference cards -->
+        <h3 class="mb-4 mt-8">📋 Etapas do Pipeline LLM</h3>
+        <div class="llm-steps-grid">
+          ${steps.map((s, i) => `
+            <div class="card-flat llm-step-ref-card" id="llm-ref-card-${i}">
+              <div class="llm-step-num">${i + 1}</div>
+              <div>
+                <h4>${s.icon} ${s.title}</h4>
+                <p class="text-sm">${s.desc}</p>
+                <p class="text-sm text-muted mt-1">${s.detail}</p>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <!-- Keep Real Pipeline button at bottom -->
+        <div class="card-flat mt-8" id="llm-real-pipeline-section">
+          <h3>⚡ Pipeline com IA Real</h3>
+          <p class="text-sm text-muted mb-4">Veja o pipeline executado com um modelo real via API.</p>
+          <div class="flex gap-4 items-center flex-wrap">
+            <input id="pipeline-real-input" class="input" value="The cat sat on"
+              placeholder="Digite um texto..." style="flex:1;min-width:200px;">
             <button class="btn ${aiReady ? 'btn-accent' : 'btn-ghost'}" id="pipeline-real-btn" ${!aiReady ? 'disabled title="Configure a API em ⚙️ Configurações"' : ''}>⚡ Pipeline Real</button>
           </div>
           ${!aiReady ? '<p class="text-xs text-muted mt-2">💡 <a href="#/settings" style="color:var(--primary);">Configure uma API</a> para o pipeline com IA real.</p>' : ''}
+          <div id="pipeline-container" class="mt-4"></div>
         </div>
-        <div id="pipeline-container" class="mt-4"></div>
       </div>
     `;
   }
@@ -353,9 +408,16 @@ const LLMDemo = (() => {
 
   /* =================== Interactions =================== */
 
+  /* =================== State for step-by-step pipeline =================== */
+  let pipelineState = { active: false, currentStep: -1, data: null };
+
   function initInteractions() {
-    // Pipeline
-    document.getElementById('pipeline-run-btn')?.addEventListener('click', runPipeline);
+    // Pipeline step-by-step
+    document.getElementById('pipeline-run-btn')?.addEventListener('click', startPipeline);
+    document.getElementById('pipeline-reset-btn')?.addEventListener('click', resetPipeline);
+    document.getElementById('llm-next-step-btn')?.addEventListener('click', advancePipelineStep);
+
+    // Real pipeline
     document.getElementById('pipeline-real-btn')?.addEventListener('click', runRealPipeline);
 
     // Generate
@@ -376,96 +438,754 @@ const LLMDemo = (() => {
     document.getElementById('start-quiz-btn')?.addEventListener('click', startQuiz);
   }
 
-  /* =================== Pipeline =================== */
+  /* =================== Step-by-Step Pipeline =================== */
 
-  function runPipeline() {
+  function startPipeline() {
     const input = document.getElementById('pipeline-input');
     const text = input?.value?.trim();
     if (!text) return;
 
-    const result = LLMEngine.simulatePipeline(text);
-    const container = document.getElementById('pipeline-container');
-    if (!container) return;
+    // Generate all step data
+    pipelineState = {
+      active: true,
+      currentStep: -1,
+      data: LLMEngine.generatePipelineStepData(text),
+    };
 
-    let html = '';
+    // Show controls
+    document.getElementById('llm-step-controls').style.display = 'flex';
+    document.getElementById('llm-pipeline-flow-state').style.display = 'block';
+    document.getElementById('llm-step-panel').style.display = 'block';
+    document.getElementById('pipeline-run-btn').style.display = 'none';
+    document.getElementById('pipeline-reset-btn').style.display = '';
 
-    result.stages.forEach((stage, idx) => {
-      html += `<div class="card-flat mb-4 pipeline-stage" style="animation: fadeSlideIn 0.4s ease ${idx * 0.15}s both;">`;
-      html += `<div class="flex items-center gap-3 mb-4">
-        <span style="font-size:1.8rem;">${stage.icon}</span>
-        <div>
-          <h4 style="margin:0;">${stage.name}</h4>
-          <p class="text-sm text-muted" style="margin:0;">${stage.desc}</p>
-        </div>
-      </div>`;
+    // Reset flow nodes
+    document.querySelectorAll('.llm-flow-node').forEach(n => {
+      n.classList.remove('active', 'done');
+    });
+    document.getElementById('llm-flow-progress').style.width = '0%';
 
-      if (idx === 0) {
-        // Tokenization
-        html += `<div class="flex flex-wrap gap-2">
-          ${stage.data.map(d => `
-            <div class="token-chip" style="--chip-color: var(--primary);">
-              <span>${d.token}</span>
-              <span class="text-xs" style="opacity:0.7;">ID: ${d.id}</span>
-            </div>
-          `).join('')}
-        </div>`;
-
-      } else if (idx === 1) {
-        // Embeddings + Position
-        html += `<div style="overflow-x:auto;"><table class="attn-step-table">
-          <thead><tr><th>Token</th><th>Embedding (4D)</th><th>Pos. Encoding</th></tr></thead><tbody>`;
-        stage.data.forEach(d => {
-          html += `<tr>
-            <td class="font-bold">${d.token}</td>
-            <td class="font-mono text-xs">[${d.vec.map(v => v.toFixed(3)).join(', ')}]</td>
-            <td class="font-mono text-xs">[${d.posEnc.map(v => v.toFixed(3)).join(', ')}]</td>
-          </tr>`;
-        });
-        html += `</tbody></table></div>`;
-
-      } else if (idx === 2) {
-        // Transformer blocks
-        html += `<div class="llm-layers-grid">
-          ${stage.data.map(layer => `
-            <div class="llm-layer-card">
-              <span class="text-xs font-bold text-primary">Layer ${layer.layer}</span>
-              <div class="llm-layer-ops">
-                ${layer.operations.map(op => `<span class="llm-op-badge">${op}</span>`).join('')}
-              </div>
-            </div>
-          `).join('')}
-        </div>`;
-
-      } else if (idx === 3) {
-        // Predictions
-        html += `<div class="flex flex-col gap-2">
-          ${stage.data.slice(0, 8).map((c, i) => {
-            const pct = (c.prob * 100).toFixed(1);
-            const isTop = i === 0;
-            return `
-            <div class="flex items-center gap-3">
-              <span class="font-bold ${isTop ? 'text-accent' : ''}" style="width:80px;">
-                ${isTop ? '⭐ ' : ''}${c.word}
-              </span>
-              <div class="progress-bar" style="flex:1;height:${isTop ? 14 : 10}px;">
-                <div class="progress-fill" style="width:${pct}%;background:${isTop ? 'var(--accent)' : 'var(--primary)'};"></div>
-              </div>
-              <span class="text-sm font-mono" style="width:55px;">${pct}%</span>
-            </div>`;
-          }).join('')}
-        </div>`;
-      }
-
-      html += `</div>`;
+    // Reset reference cards
+    document.querySelectorAll('.llm-step-ref-card').forEach(c => {
+      c.classList.remove('active', 'done');
     });
 
-    container.innerHTML = html;
+    // Show first step
+    advancePipelineStep();
+  }
+
+  function resetPipeline() {
+    pipelineState = { active: false, currentStep: -1, data: null };
+    document.getElementById('llm-step-controls').style.display = 'none';
+    document.getElementById('llm-pipeline-flow-state').style.display = 'none';
+    document.getElementById('llm-step-panel').style.display = 'none';
+    document.getElementById('pipeline-run-btn').style.display = '';
+    document.getElementById('pipeline-reset-btn').style.display = 'none';
+    document.querySelectorAll('.llm-flow-node').forEach(n => n.classList.remove('active', 'done'));
+    document.querySelectorAll('.llm-step-ref-card').forEach(c => c.classList.remove('active', 'done'));
+  }
+
+  function advancePipelineStep() {
+    if (!pipelineState.active) return;
+    const steps = LLMEngine.LLM_PIPELINE_STEPS;
+    const prev = pipelineState.currentStep;
+
+    if (prev >= steps.length - 1) return; // already at end
+
+    // Mark previous as done
+    if (prev >= 0) {
+      const prevNode = document.getElementById(`llm-flow-node-${prev}`);
+      if (prevNode) { prevNode.classList.remove('active'); prevNode.classList.add('done'); }
+      const prevCard = document.getElementById(`llm-ref-card-${prev}`);
+      if (prevCard) { prevCard.classList.remove('active'); prevCard.classList.add('done'); }
+    }
+
+    pipelineState.currentStep = prev + 1;
+    const idx = pipelineState.currentStep;
+    const step = steps[idx];
+
+    // Update flow node
+    const node = document.getElementById(`llm-flow-node-${idx}`);
+    if (node) node.classList.add('active');
+    const refCard = document.getElementById(`llm-ref-card-${idx}`);
+    if (refCard) { refCard.classList.add('active'); refCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+
+    // Progress bar
+    const pct = ((idx + 1) / steps.length) * 100;
+    document.getElementById('llm-flow-progress').style.width = pct + '%';
+
+    // Counter
+    document.getElementById('llm-step-counter').textContent = `Passo ${idx + 1} / ${steps.length}`;
+
+    // Step info
+    document.getElementById('llm-step-title').textContent = `${step.icon} ${step.title}`;
+    document.getElementById('llm-step-desc').textContent = step.desc;
+    document.getElementById('llm-step-detail').textContent = step.detail;
+
+    // Rich visualization
+    const vizContainer = document.getElementById('llm-step-viz');
+    renderLLMStepVisualization(vizContainer, step, idx, pipelineState.data);
+
+    // Update button
+    const btn = document.getElementById('llm-next-step-btn');
+    if (idx >= steps.length - 1) {
+      btn.textContent = '✅ Pipeline Completo!';
+      btn.disabled = true;
+    } else {
+      btn.textContent = `${steps[idx + 1].icon} Próximo: ${steps[idx + 1].title} →`;
+      btn.disabled = false;
+    }
+
+    // Scroll to panel
+    document.getElementById('llm-step-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /* =================== Step Visualization Renderers =================== */
+
+  function renderLLMStepVisualization(container, step, idx, data) {
+    container.innerHTML = '';
+    const div = document.createElement('div');
+    div.className = 'step-viz';
+    container.appendChild(div);
+
+    switch (step.id) {
+      case 'input':     renderInputViz(div, data); break;
+      case 'tokenize':  renderTokenizeViz(div, data); break;
+      case 'embedding': renderEmbeddingViz(div, data); break;
+      case 'positional': renderPositionalViz(div, data); break;
+      case 'attention': renderAttentionViz(div, data); break;
+      case 'addnorm1':  renderAddNormViz(div, data); break;
+      case 'ffn':       renderFFNViz(div, data); break;
+      case 'layers':    renderLayersViz(div, data); break;
+      case 'linear':    renderLinearViz(div, data); break;
+      case 'softmax':   renderSoftmaxViz(div, data); break;
+    }
+  }
+
+  /* ---- Step 0: Input Text ---- */
+  function renderInputViz(el, data) {
+    const text = data.input;
+    const chars = text.split('');
+    el.innerHTML = `
+      <div class="llm-viz-section">
+        <h5>Texto de entrada</h5>
+        <div class="llm-input-display">
+          ${chars.map((c, i) => `<span class="llm-char" style="animation-delay:${i * 40}ms">${c === ' ' ? '⎵' : escapeHtml(c)}</span>`).join('')}
+        </div>
+      </div>
+      <div class="sviz-stats-row mt-4">
+        <div class="sviz-stat"><span class="sviz-stat-label">Caracteres</span><span class="sviz-stat-value">${text.length}</span></div>
+        <div class="sviz-stat"><span class="sviz-stat-label">Palavras</span><span class="sviz-stat-value">${text.trim().split(/\s+/).length}</span></div>
+        <div class="sviz-stat"><span class="sviz-stat-label">Bytes (UTF-8)</span><span class="sviz-stat-value">${new TextEncoder().encode(text).length}</span></div>
+      </div>
+      <div class="sviz-formula mt-4">string = "${escapeHtml(text)}" → [${chars.map(c => c.charCodeAt(0)).join(', ')}]  (Unicode codepoints)</div>
+    `;
+  }
+
+  /* ---- Step 1: Tokenization ---- */
+  function renderTokenizeViz(el, data) {
+    const tokens = data.bpeTokens;
+    el.innerHTML = `
+      <div class="llm-viz-section">
+        <h5>Tokens BPE</h5>
+        <div class="flex flex-wrap gap-2">
+          ${tokens.map((t, i) => `
+            <div class="token-chip" style="--chip-color:${t.isContinuation ? 'var(--accent)' : 'var(--primary)'};animation:tokenPop 0.3s ease ${i * 60}ms both;">
+              <span>${t.isContinuation ? '##' : ''}${escapeHtml(t.surface)}</span>
+              <span class="text-xs" style="opacity:0.7">ID:${t.id}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="sviz-stats-row mt-4">
+        <div class="sviz-stat"><span class="sviz-stat-label">Total tokens</span><span class="sviz-stat-value">${tokens.length}</span></div>
+        <div class="sviz-stat"><span class="sviz-stat-label">Vocab size</span><span class="sviz-stat-value">50.257</span></div>
+        <div class="sviz-stat"><span class="sviz-stat-label">Algoritmo</span><span class="sviz-stat-value">BPE</span></div>
+      </div>
+      <div class="llm-viz-section mt-4">
+        <h5>Como funciona o BPE</h5>
+        <div class="llm-bpe-steps">
+          <div class="llm-bpe-step"><span class="llm-bpe-num">1</span> Dividir texto em caracteres</div>
+          <div class="llm-bpe-arrow">↓</div>
+          <div class="llm-bpe-step"><span class="llm-bpe-num">2</span> Encontrar par mais frequente</div>
+          <div class="llm-bpe-arrow">↓</div>
+          <div class="llm-bpe-step"><span class="llm-bpe-num">3</span> Unir par → novo token</div>
+          <div class="llm-bpe-arrow">↓</div>
+          <div class="llm-bpe-step"><span class="llm-bpe-num">4</span> Repetir até vocab_size</div>
+        </div>
+      </div>
+      <div class="sviz-formula mt-4">[${tokens.map(t => t.id).join(', ')}] → tensor int64 shape (1, ${tokens.length})</div>
+    `;
+  }
+
+  /* ---- Step 2: Embedding Lookup ---- */
+  function renderEmbeddingViz(el, data) {
+    // Draw embedding heatmap on canvas
+    el.innerHTML = `
+      <div class="llm-viz-section">
+        <h5>Tabela de Embedding</h5>
+        <div class="llm-emb-diagram">
+          <div class="llm-emb-table-viz">
+            <div class="llm-emb-header">Embedding Matrix</div>
+            <div class="llm-emb-dims">50.257 × 12.288</div>
+            <canvas id="llm-emb-heatmap" width="180" height="120"></canvas>
+          </div>
+          <div class="llm-emb-arrow">→</div>
+          <div class="llm-emb-result">
+            <div class="llm-emb-header">Vetores de Saída</div>
+            ${data.embeddings.slice(0, 5).map(e => `
+              <div class="llm-emb-row">
+                <span class="llm-emb-token">${escapeHtml(e.token)}</span>
+                <span class="font-mono text-xs">[${e.vec.slice(0, 4).map(v => v.toFixed(2)).join(', ')}, …]</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="sviz-stats-row mt-4">
+        <div class="sviz-stat"><span class="sviz-stat-label">Dimensões</span><span class="sviz-stat-value">12.288</span></div>
+        <div class="sviz-stat"><span class="sviz-stat-label">Parâmetros</span><span class="sviz-stat-value">~618M</span></div>
+        <div class="sviz-stat"><span class="sviz-stat-label">Output shape</span><span class="sviz-stat-value">(1, ${data.bpeTokens.length}, 12288)</span></div>
+      </div>
+      <div class="sviz-formula mt-4">E[token_id] → ℝ^12288   (lookup na tabela, sem multiplicação)</div>
+    `;
+    // Draw heatmap
+    setTimeout(() => drawEmbHeatmap('llm-emb-heatmap', data.embeddings), 50);
+  }
+
+  function drawEmbHeatmap(canvasId, embeddings) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const rows = embeddings.length;
+    const cols = 12;
+    const cellW = canvas.width / cols;
+    const cellH = canvas.height / rows;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const v = (embeddings[r].vec[c] + 1) / 2; // normalize to 0-1
+        const hue = 240 - v * 240; // blue→red
+        ctx.fillStyle = `hsl(${hue}, 70%, ${40 + v * 30}%)`;
+        ctx.fillRect(c * cellW, r * cellH, cellW - 1, cellH - 1);
+      }
+    }
+  }
+
+  /* ---- Step 3: Positional Encoding ---- */
+  function renderPositionalViz(el, data) {
+    el.innerHTML = `
+      <div class="llm-viz-section">
+        <h5>Curvas Sinusoidais</h5>
+        <canvas id="llm-pos-canvas" width="360" height="140"></canvas>
+        <div class="llm-pos-legend mt-2">
+          <span><span style="color:#6366f1;">●</span> sin (dims pares)</span>
+          <span><span style="color:#f59e0b;">●</span> cos (dims ímpares)</span>
+        </div>
+      </div>
+      <div class="llm-viz-section mt-4">
+        <h5>Embedding + Posição = Input Final</h5>
+        <div class="llm-pos-addition">
+          <div class="llm-pos-box">
+            <span class="text-xs font-bold">Embedding</span>
+            <span class="font-mono text-xs">[${data.embeddings[0]?.vec.slice(0, 3).map(v => v.toFixed(2)).join(', ')}, …]</span>
+          </div>
+          <span class="llm-pos-op">+</span>
+          <div class="llm-pos-box">
+            <span class="text-xs font-bold">Pos. Enc.</span>
+            <span class="font-mono text-xs">[${data.posEncodings[0]?.slice(0, 3).map(v => v.toFixed(2)).join(', ')}, …]</span>
+          </div>
+          <span class="llm-pos-op">=</span>
+          <div class="llm-pos-box llm-pos-result">
+            <span class="text-xs font-bold">Input</span>
+            <span class="font-mono text-xs">[${data.embeddings[0]?.vec.slice(0, 3).map((v, i) => (v + data.posEncodings[0][i]).toFixed(2)).join(', ')}, …]</span>
+          </div>
+        </div>
+      </div>
+      <div class="sviz-formula mt-4">x_pos = Embedding(token) + PE(position)   ∈ ℝ^(seq_len × d_model)</div>
+    `;
+    setTimeout(() => drawPosEncodingCanvas('llm-pos-canvas', data.posEncodings), 50);
+  }
+
+  function drawPosEncodingCanvas(canvasId, posEncodings) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--surface-2').trim() || '#1a1a2e';
+    ctx.fillRect(0, 0, w, h);
+
+    const numPos = posEncodings.length;
+    const dims = Math.min(posEncodings[0]?.length || 4, 6);
+    const colors = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4'];
+
+    // Draw grid lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 0.5;
+    for (let y = 0; y <= 4; y++) {
+      ctx.beginPath();
+      ctx.moveTo(0, h * y / 4);
+      ctx.lineTo(w, h * y / 4);
+      ctx.stroke();
+    }
+
+    // Plot each dimension
+    for (let d = 0; d < dims; d++) {
+      ctx.strokeStyle = colors[d % colors.length];
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let pos = 0; pos < 50; pos++) {
+        const x = (pos / 50) * w;
+        const div = Math.pow(10000, (2 * Math.floor(d / 2)) / 12);
+        const val = d % 2 === 0 ? Math.sin(pos / div) : Math.cos(pos / div);
+        const y = h / 2 - val * (h / 2 - 10);
+        if (pos === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    // Mark token positions
+    for (let i = 0; i < numPos && i < 10; i++) {
+      const x = (i / 50) * w;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(x, h / 2, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  /* ---- Step 4: Self-Attention ---- */
+  function renderAttentionViz(el, data) {
+    const tokens = data.attnTokens;
+    el.innerHTML = `
+      <div class="llm-viz-section">
+        <h5>Projeções Q, K, V</h5>
+        <div class="sviz-crossattn">
+          <div class="sviz-ca-side">
+            <div class="sviz-ca-label">Query (Q)</div>
+            <div class="sviz-ca-tensor">x · W_Q</div>
+          </div>
+          <div class="sviz-ca-side">
+            <div class="sviz-ca-label">Key (K)</div>
+            <div class="sviz-ca-tensor">x · W_K</div>
+          </div>
+          <div class="sviz-ca-side">
+            <div class="sviz-ca-label">Value (V)</div>
+            <div class="sviz-ca-tensor">x · W_V</div>
+          </div>
+        </div>
+      </div>
+      <div class="llm-viz-section mt-4">
+        <h5>Mapa de Atenção (causal mask)</h5>
+        <div class="llm-attn-map-wrap">
+          <div class="llm-attn-labels-col">
+            ${tokens.map(t => `<span>${escapeHtml(t)}</span>`).join('')}
+          </div>
+          <canvas id="llm-attn-canvas" width="${tokens.length * 36}" height="${tokens.length * 36}"></canvas>
+          <div class="llm-attn-labels-row">
+            ${tokens.map(t => `<span>${escapeHtml(t)}</span>`).join('')}
+          </div>
+        </div>
+        <div class="llm-attn-legend mt-2">
+          <span>0.0</span>
+          <div class="llm-attn-gradient"></div>
+          <span>1.0</span>
+          <span class="text-xs text-muted" style="margin-left:0.5rem;">▲ Triangular inferior = causal mask</span>
+        </div>
+      </div>
+      <div class="sviz-stats-row mt-4">
+        <div class="sviz-stat"><span class="sviz-stat-label">Cabeças</span><span class="sviz-stat-value">96</span></div>
+        <div class="sviz-stat"><span class="sviz-stat-label">d_head</span><span class="sviz-stat-value">128</span></div>
+        <div class="sviz-stat"><span class="sviz-stat-label">Complexidade</span><span class="sviz-stat-value">O(n²·d)</span></div>
+      </div>
+      <div class="sviz-formula mt-4">Attention(Q,K,V) = softmax(Q·K^T / √128) × V</div>
+    `;
+    setTimeout(() => drawAttnHeatmap('llm-attn-canvas', data.attnScores, tokens), 50);
+  }
+
+  function drawAttnHeatmap(canvasId, scores, tokens) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const n = scores.length;
+    const cell = canvas.width / n;
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        const v = scores[i][j];
+        if (v === 0) {
+          ctx.fillStyle = 'rgba(50,50,50,0.3)';
+        } else {
+          const alpha = Math.min(v * 2.5, 1);
+          ctx.fillStyle = `rgba(99, 102, 241, ${alpha})`;
+        }
+        ctx.fillRect(j * cell, i * cell, cell - 1, cell - 1);
+        // Show value
+        if (v > 0.01) {
+          ctx.fillStyle = v > 0.3 ? '#fff' : 'rgba(255,255,255,0.6)';
+          ctx.font = '9px JetBrains Mono, monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(v.toFixed(2), j * cell + cell / 2, i * cell + cell / 2);
+        }
+      }
+    }
+  }
+
+  /* ---- Step 5: Add & Norm ---- */
+  function renderAddNormViz(el, data) {
+    el.innerHTML = `
+      <div class="llm-viz-section">
+        <h5>Conexão Residual + LayerNorm</h5>
+        <div class="llm-residual-diagram">
+          <div class="llm-res-box">x<br><span class="text-xs">input</span></div>
+          <div class="llm-res-path">
+            <div class="llm-res-main-path">
+              <div class="llm-res-arrow">→</div>
+              <div class="llm-res-block">Self-Attention</div>
+              <div class="llm-res-arrow">→</div>
+            </div>
+            <div class="llm-res-skip">
+              <span class="text-xs">skip connection</span>
+              <div class="llm-res-skip-line"></div>
+            </div>
+          </div>
+          <div class="llm-res-op">+</div>
+          <div class="llm-res-arrow">→</div>
+          <div class="llm-res-block llm-res-ln">LayerNorm</div>
+          <div class="llm-res-arrow">→</div>
+          <div class="llm-res-box llm-res-output">out</div>
+        </div>
+      </div>
+      <div class="llm-viz-section mt-4">
+        <h5>Por que Residual?</h5>
+        <div class="llm-why-grid">
+          <div class="llm-why-card">
+            <span>🚀</span>
+            <span class="text-sm">Gradientes fluem direto por 96 camadas</span>
+          </div>
+          <div class="llm-why-card">
+            <span>🛡️</span>
+            <span class="text-sm">Previne vanishing / exploding gradients</span>
+          </div>
+          <div class="llm-why-card">
+            <span>📚</span>
+            <span class="text-sm">Cada camada aprende o "delta" — o que adicionar</span>
+          </div>
+        </div>
+      </div>
+      <div class="sviz-formula mt-4">output = LayerNorm(x + SubLayer(x))     onde μ = E[x], σ² = Var[x]</div>
+    `;
+  }
+
+  /* ---- Step 6: Feed-Forward Network ---- */
+  function renderFFNViz(el, data) {
+    el.innerHTML = `
+      <div class="llm-viz-section">
+        <h5>Rede Feed-Forward (MLP)</h5>
+        <div class="llm-ffn-diagram">
+          <div class="llm-ffn-layer">
+            <div class="llm-ffn-label">Input</div>
+            <div class="llm-ffn-bar" style="width:60px;background:var(--primary);">12.288</div>
+          </div>
+          <div class="llm-ffn-arrow">→ W₁ →</div>
+          <div class="llm-ffn-layer">
+            <div class="llm-ffn-label">Expansão 4×</div>
+            <div class="llm-ffn-bar" style="width:200px;background:var(--accent);">49.152</div>
+          </div>
+          <div class="llm-ffn-arrow">→ GELU →</div>
+          <div class="llm-ffn-layer">
+            <div class="llm-ffn-label">Projeção</div>
+            <div class="llm-ffn-bar" style="width:60px;background:var(--primary);">12.288</div>
+          </div>
+        </div>
+      </div>
+      <div class="llm-viz-section mt-4">
+        <h5>Ativação GELU</h5>
+        <canvas id="llm-gelu-canvas" width="280" height="120"></canvas>
+        <p class="text-xs text-muted mt-2">GELU(x) = x · Φ(x) — versão suave de ReLU, usada em GPT e BERT.</p>
+      </div>
+      <div class="sviz-stats-row mt-4">
+        <div class="sviz-stat"><span class="sviz-stat-label">Parâmetros/camada</span><span class="sviz-stat-value">~1.2B</span></div>
+        <div class="sviz-stat"><span class="sviz-stat-label">d_ff</span><span class="sviz-stat-value">49.152</span></div>
+        <div class="sviz-stat"><span class="sviz-stat-label">FLOPs</span><span class="sviz-stat-value">~2 × 12K × 49K</span></div>
+      </div>
+      <div class="sviz-formula mt-4">FFN(x) = GELU(x · W₁ + b₁) · W₂ + b₂</div>
+    `;
+    setTimeout(() => drawGeluCanvas('llm-gelu-canvas'), 50);
+  }
+
+  function drawGeluCanvas(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--surface-2').trim() || '#1a1a2e';
+    ctx.fillRect(0, 0, w, h);
+
+    // Grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h); ctx.stroke();
+
+    // GELU curve
+    ctx.strokeStyle = '#6366f1';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let px = 0; px < w; px++) {
+      const x = (px / w) * 8 - 4; // range -4 to 4
+      // GELU approximation
+      const gelu = 0.5 * x * (1 + Math.tanh(Math.sqrt(2 / Math.PI) * (x + 0.044715 * x * x * x)));
+      const y = h / 2 - gelu * (h / 8);
+      if (px === 0) ctx.moveTo(px, y);
+      else ctx.lineTo(px, y);
+    }
+    ctx.stroke();
+
+    // ReLU for comparison (dashed)
+    ctx.strokeStyle = 'rgba(245,158,11,0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    for (let px = 0; px < w; px++) {
+      const x = (px / w) * 8 - 4;
+      const relu = Math.max(0, x);
+      const y = h / 2 - relu * (h / 8);
+      if (px === 0) ctx.moveTo(px, y);
+      else ctx.lineTo(px, y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Labels
+    ctx.fillStyle = '#6366f1';
+    ctx.font = '10px sans-serif';
+    ctx.fillText('GELU', w - 40, h / 2 - 30);
+    ctx.fillStyle = 'rgba(245,158,11,0.7)';
+    ctx.fillText('ReLU', w - 40, h / 2 - 45);
+  }
+
+  /* ---- Step 7: N× Layers ---- */
+  function renderLayersViz(el, data) {
+    const acts = data.layerActivations;
+    el.innerHTML = `
+      <div class="llm-viz-section">
+        <h5>Progresso Através das Camadas</h5>
+        <canvas id="llm-layers-canvas" width="360" height="160"></canvas>
+        <div class="llm-pos-legend mt-2">
+          <span><span style="color:#6366f1;">●</span> Sintaxe</span>
+          <span><span style="color:#f59e0b;">●</span> Semântica</span>
+        </div>
+      </div>
+      <div class="llm-viz-section mt-4">
+        <h5>O que cada nível capta</h5>
+        <div class="llm-layer-progression">
+          ${[
+            { range: '1–12', label: 'Sintaxe', desc: 'POS tags, estrutura gramatical', color: '#6366f1', pct: 85 },
+            { range: '13–48', label: 'Semântica', desc: 'Significado, relações, entidades', color: '#10b981', pct: 70 },
+            { range: '49–80', label: 'Raciocínio', desc: 'Inferência, lógica, analogias', color: '#f59e0b', pct: 55 },
+            { range: '81–96', label: 'Predição', desc: 'Próximo token, geração de texto', color: '#ef4444', pct: 90 },
+          ].map(l => `
+            <div class="llm-layer-range">
+              <span class="llm-layer-range-label">L${l.range}</span>
+              <div class="llm-layer-range-info">
+                <span class="text-sm font-bold" style="color:${l.color}">${l.label}</span>
+                <span class="text-xs text-muted">${l.desc}</span>
+              </div>
+              <div class="sviz-freq-bar-wrap" style="width:100px;">
+                <div class="sviz-freq-bar" data-target-width="${l.pct}" style="width:0%;background:${l.color};"></div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="sviz-stats-row mt-4">
+        <div class="sviz-stat"><span class="sviz-stat-label">Camadas</span><span class="sviz-stat-value">96</span></div>
+        <div class="sviz-stat"><span class="sviz-stat-label">Parâmetros total</span><span class="sviz-stat-value">175B</span></div>
+        <div class="sviz-stat"><span class="sviz-stat-label">Params/camada</span><span class="sviz-stat-value">~1.8B</span></div>
+      </div>
+    `;
+    setTimeout(() => {
+      drawLayersCanvas('llm-layers-canvas', acts);
+      animateStepBars(el);
+    }, 50);
+  }
+
+  function drawLayersCanvas(canvasId, acts) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--surface-2').trim() || '#1a1a2e';
+    ctx.fillRect(0, 0, w, h);
+
+    // Grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 4; i++) {
+      ctx.beginPath(); ctx.moveTo(0, i * h / 4); ctx.lineTo(w, i * h / 4); ctx.stroke();
+    }
+
+    const pad = 20;
+    const plotW = w - pad * 2;
+    const plotH = h - pad * 2;
+
+    // Syntax curve (decreasing)
+    ctx.strokeStyle = '#6366f1';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    acts.forEach((a, i) => {
+      const x = pad + (a.layer / 96) * plotW;
+      const y = pad + plotH - (a.syntaxPct / 100) * plotH;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Semantic curve (increasing)
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    acts.forEach((a, i) => {
+      const x = pad + (a.layer / 96) * plotW;
+      const y = pad + plotH - (a.semanticPct / 100) * plotH;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Dots
+    acts.forEach(a => {
+      const x = pad + (a.layer / 96) * plotW;
+      ctx.fillStyle = '#6366f1';
+      ctx.beginPath(); ctx.arc(x, pad + plotH - (a.syntaxPct / 100) * plotH, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath(); ctx.arc(x, pad + plotH - (a.semanticPct / 100) * plotH, 3, 0, Math.PI * 2); ctx.fill();
+    });
+
+    // X-axis labels
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    [1, 24, 48, 72, 96].forEach(l => {
+      const x = pad + (l / 96) * plotW;
+      ctx.fillText(`L${l}`, x, h - 2);
+    });
+  }
+
+  /* ---- Step 8: Linear Projection ---- */
+  function renderLinearViz(el, data) {
+    const logits = data.logits;
+    const maxLogit = Math.max(...logits.map(l => Math.abs(l.logit)));
+    el.innerHTML = `
+      <div class="llm-viz-section">
+        <h5>Projeção no Vocabulário</h5>
+        <div class="llm-proj-diagram">
+          <div class="llm-proj-box">
+            <span class="text-xs">Vetor do último token</span>
+            <span class="font-mono text-xs">ℝ^12.288</span>
+          </div>
+          <span class="llm-proj-arrow">× W_vocab →</span>
+          <div class="llm-proj-box llm-proj-logits">
+            <span class="text-xs">Logits</span>
+            <span class="font-mono text-xs">ℝ^50.257</span>
+          </div>
+        </div>
+      </div>
+      <div class="llm-viz-section mt-4">
+        <h5>Top Logits (scores brutos)</h5>
+        <div class="sviz-freq-bars">
+          ${logits.map((l, i) => {
+            const pct = (Math.abs(l.logit) / maxLogit * 100).toFixed(0);
+            return `
+            <div class="sviz-freq-bar-row">
+              <span class="sviz-freq-label" style="min-width:80px;">${i === 0 ? '⭐ ' : ''}${l.token}</span>
+              <div class="sviz-freq-bar-wrap">
+                <div class="sviz-freq-bar" data-target-width="${pct}" style="width:0%;background:${i === 0 ? 'var(--accent)' : 'var(--primary)'};"></div>
+              </div>
+              <span class="sviz-freq-pct">${l.logit.toFixed(2)}</span>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="sviz-formula mt-4">logits = h_N · W_vocab + b_vocab     ∈ ℝ^50.257</div>
+    `;
+    setTimeout(() => animateStepBars(el), 50);
+  }
+
+  /* ---- Step 9: Softmax + Sampling ---- */
+  function renderSoftmaxViz(el, data) {
+    const cands = data.candidates.slice(0, 8);
+    const maxProb = Math.max(...cands.map(c => c.prob));
+    el.innerHTML = `
+      <div class="llm-viz-section">
+        <h5>Distribuição de Probabilidade</h5>
+        <div class="llm-softmax-bars">
+          ${cands.map((c, i) => {
+            const pct = (c.prob * 100).toFixed(1);
+            const barW = (c.prob / maxProb * 100).toFixed(0);
+            return `
+            <div class="llm-softmax-row">
+              <span class="llm-softmax-token ${i === 0 ? 'top' : ''}">${i === 0 ? '🎯 ' : ''}${c.word}</span>
+              <div class="sviz-freq-bar-wrap">
+                <div class="sviz-freq-bar" data-target-width="${barW}" style="width:0%;background:${i === 0 ? 'var(--accent)' : 'var(--primary)'};"></div>
+              </div>
+              <span class="sviz-freq-pct">${pct}%</span>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="llm-viz-section mt-4">
+        <h5>Estratégias de Sampling</h5>
+        <div class="llm-sampling-grid">
+          <div class="llm-sampling-card">
+            <span>🌡️</span>
+            <div>
+              <span class="text-sm font-bold">Temperature</span>
+              <span class="text-xs text-muted">Achata ou aguça a distribuição</span>
+            </div>
+          </div>
+          <div class="llm-sampling-card">
+            <span>🔝</span>
+            <div>
+              <span class="text-sm font-bold">Top-K</span>
+              <span class="text-xs text-muted">Mantém apenas K melhores</span>
+            </div>
+          </div>
+          <div class="llm-sampling-card">
+            <span>📊</span>
+            <div>
+              <span class="text-sm font-bold">Top-P (Nucleus)</span>
+              <span class="text-xs text-muted">Acumula até P% de prob.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="llm-viz-section mt-4">
+        <h5>Resultado</h5>
+        <div class="llm-result-box">
+          <span class="text-sm text-muted">Próximo token selecionado:</span>
+          <span class="llm-result-token">${cands[0]?.word || '?'}</span>
+          <span class="text-sm text-muted">com probabilidade ${(cands[0]?.prob * 100).toFixed(1)}%</span>
+        </div>
+      </div>
+      <div class="sviz-formula mt-4">P(token_i) = e^(z_i / T) / Σ e^(z_j / T)     →     sample ~ P(token)</div>
+    `;
+    setTimeout(() => animateStepBars(el), 50);
+  }
+
+  /* ---- Shared: animate bars with data-target-width ---- */
+  function animateStepBars(container) {
+    const bars = container.querySelectorAll('[data-target-width]');
+    bars.forEach((bar, i) => {
+      setTimeout(() => {
+        bar.style.width = bar.dataset.targetWidth + '%';
+      }, i * 60 + 100);
+    });
   }
 
   /* =================== Real Pipeline (via API) =================== */
 
   async function runRealPipeline() {
-    const input = document.getElementById('pipeline-input');
+    const input = document.getElementById('pipeline-real-input');
     const text = input?.value?.trim();
     if (!text) return;
 

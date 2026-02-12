@@ -1274,6 +1274,554 @@ input[type="range"]::-webkit-slider-thumb:hover {
   color: var(--primary);
 }
 
+/* ====== LLM Step-by-Step Pipeline ====== */
+.llm-step-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.llm-step-counter {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Flow nodes bar */
+.llm-pipeline-flow-state {
+  margin-bottom: 1rem;
+}
+.llm-flow-nodes {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 0;
+}
+.llm-flow-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  min-width: 48px;
+  transition: all 0.3s ease;
+  opacity: 0.5;
+}
+.llm-flow-node.active {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 15%, var(--surface));
+  opacity: 1;
+  transform: scale(1.08);
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.3);
+}
+.llm-flow-node.done {
+  border-color: #10b981;
+  opacity: 0.85;
+}
+.llm-flow-node.done::after {
+  content: '✓';
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  font-size: 10px;
+  background: #10b981;
+  color: #fff;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.llm-flow-node { position: relative; }
+.llm-flow-icon { font-size: 1rem; }
+.llm-flow-label { font-size: 0.6rem; color: var(--text-muted); white-space: nowrap; }
+.llm-flow-arrow { font-size: 0.7rem; color: var(--text-muted); }
+.llm-flow-progress-wrap {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-2);
+  margin-top: 0.25rem;
+  overflow: hidden;
+}
+.llm-flow-progress {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  transition: width 0.5s ease;
+}
+
+/* Step viz container */
+.llm-step-viz { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.llm-step-viz:empty { display: none; margin: 0; padding: 0; border: none; }
+
+.llm-viz-section { margin-bottom: 0.75rem; }
+.llm-viz-section h5 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+}
+
+/* Steps reference grid */
+.llm-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.llm-step-ref-card {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  transition: all 0.3s ease;
+  border-left: 3px solid transparent;
+}
+.llm-step-ref-card.active {
+  border-left-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+}
+.llm-step-ref-card.done {
+  border-left-color: #10b981;
+  opacity: 0.75;
+}
+.llm-step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.llm-step-ref-card.active .llm-step-num {
+  background: var(--primary);
+  color: #fff;
+}
+.llm-step-ref-card.done .llm-step-num {
+  background: #10b981;
+  color: #fff;
+}
+
+/* ---- Input viz ---- */
+.llm-input-display {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 0.5rem;
+  background: var(--surface-2);
+  border-radius: 8px;
+}
+.llm-char {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 32px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  animation: tokenPop 0.25s ease both;
+}
+
+/* ---- BPE steps ---- */
+.llm-bpe-steps {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+.llm-bpe-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  background: var(--surface-2);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+.llm-bpe-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.llm-bpe-arrow {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* ---- Embedding viz ---- */
+.llm-emb-diagram {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.llm-emb-table-viz {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  background: var(--surface-2);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.llm-emb-header {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+.llm-emb-dims {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.llm-emb-arrow {
+  font-size: 1.5rem;
+  color: var(--text-muted);
+}
+.llm-emb-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.llm-emb-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0.5rem;
+  background: var(--surface-2);
+  border-radius: 4px;
+}
+.llm-emb-token {
+  font-weight: 600;
+  min-width: 50px;
+  font-size: 0.85rem;
+}
+
+/* ---- Positional encoding ---- */
+.llm-pos-legend {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.8rem;
+}
+.llm-pos-addition {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.llm-pos-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.4rem 0.75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.llm-pos-result {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-2));
+}
+.llm-pos-op {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* ---- Attention heatmap ---- */
+.llm-attn-map-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+.llm-attn-labels-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding-top: 2px;
+}
+.llm-attn-labels-col span {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  justify-content: flex-end;
+  padding-right: 4px;
+}
+.llm-attn-labels-row {
+  display: flex;
+  gap: 0;
+  margin-top: 2px;
+}
+.llm-attn-labels-row span {
+  width: 36px;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+#llm-attn-canvas {
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.llm-attn-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.llm-attn-gradient {
+  width: 80px;
+  height: 10px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(50,50,50,0.3), rgba(99, 102, 241, 1));
+}
+
+/* ---- Residual diagram ---- */
+.llm-residual-diagram {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 0.5rem;
+}
+.llm-res-box {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  text-align: center;
+}
+.llm-res-output {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface-2));
+}
+.llm-res-block {
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--primary) 15%, var(--surface));
+  border: 1px solid var(--primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.llm-res-ln {
+  background: color-mix(in srgb, var(--accent) 15%, var(--surface));
+  border-color: var(--accent);
+}
+.llm-res-op {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+.llm-res-arrow {
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+.llm-res-path {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+.llm-res-main-path { display: flex; align-items: center; gap: 0.35rem; }
+.llm-res-skip {
+  font-size: 0.65rem;
+  color: var(--primary);
+  text-align: center;
+}
+.llm-res-skip-line {
+  width: 100%;
+  height: 2px;
+  background: var(--primary);
+  margin-top: 2px;
+  border-radius: 1px;
+}
+
+/* Why cards */
+.llm-why-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.5rem;
+}
+.llm-why-card {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: var(--surface-2);
+  border-radius: 8px;
+}
+
+/* ---- FFN diagram ---- */
+.llm-ffn-diagram {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 0.5rem;
+}
+.llm-ffn-layer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+.llm-ffn-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.llm-ffn-bar {
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: #fff;
+  font-weight: 600;
+}
+.llm-ffn-arrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+#llm-gelu-canvas,
+#llm-pos-canvas,
+#llm-layers-canvas {
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  width: 100%;
+  max-width: 360px;
+}
+
+/* ---- Layer progression ---- */
+.llm-layer-progression {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.llm-layer-range {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.llm-layer-range-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  min-width: 50px;
+  color: var(--text-muted);
+}
+.llm-layer-range-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 130px;
+}
+
+/* ---- Linear projection ---- */
+.llm-proj-diagram {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.llm-proj-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.5rem 1rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.llm-proj-logits {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-2));
+}
+.llm-proj-arrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* ---- Softmax bars ---- */
+.llm-softmax-bars { display: flex; flex-direction: column; gap: 0.4rem; }
+.llm-softmax-row { display: flex; align-items: center; gap: 0.5rem; }
+.llm-softmax-token {
+  font-weight: 600;
+  font-size: 0.9rem;
+  min-width: 80px;
+}
+.llm-softmax-token.top { color: var(--accent); }
+
+/* ---- Sampling grid ---- */
+.llm-sampling-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.5rem;
+}
+.llm-sampling-card {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: var(--surface-2);
+  border-radius: 8px;
+}
+.llm-sampling-card div {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Result box ---- */
+.llm-result-box {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  border: 1.5px solid var(--accent);
+  border-radius: 10px;
+  flex-wrap: wrap;
+}
+.llm-result-token {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--accent);
+  font-family: 'JetBrains Mono', monospace;
+}
+
 /* Generation text */
 .gen-text {
   font-size: var(--text-lg);
