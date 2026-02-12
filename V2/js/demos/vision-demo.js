@@ -6,6 +6,8 @@
 
 const VisionDemo = (() => {
 
+  let uploadedImageFile = null;
+
   /* =================== Render =================== */
   function render() {
     const state = Progress.getState();
@@ -27,6 +29,7 @@ const VisionDemo = (() => {
 
             <div class="tab-bar">
               <button class="tab active" data-tab="learn">📖 Aprender</button>
+              <button class="tab" data-tab="realimg">📷 Imagem Real</button>
               <button class="tab" data-tab="conv">🔲 Convolução</button>
               <button class="tab" data-tab="filters">🎨 Filtros</button>
               <button class="tab" data-tab="pipeline">🏗️ CNN Pipeline</button>
@@ -35,6 +38,7 @@ const VisionDemo = (() => {
             </div>
 
             <div id="tab-learn" class="tab-content active">${renderLearnTab()}</div>
+            <div id="tab-realimg" class="tab-content hidden">${renderRealImageTab()}</div>
             <div id="tab-conv" class="tab-content hidden">${renderConvTab()}</div>
             <div id="tab-filters" class="tab-content hidden">${renderFiltersTab()}</div>
             <div id="tab-pipeline" class="tab-content hidden">${renderPipelineTab()}</div>
@@ -120,6 +124,50 @@ const VisionDemo = (() => {
             `).join('')}
           </div>
         </div>
+      </div>
+    `;
+  }
+
+  /* =================== Tab: Real Image =================== */
+  function renderRealImageTab() {
+    return `
+      <div class="real-image-section">
+        <div class="card-flat mb-4">
+          <h3>📷 Processamento de Imagem Real</h3>
+          <p class="text-sm text-muted">Carregue uma imagem real e veja todo o processamento que o computador faz: pixels, grayscale, matriz numérica, convoluções — tudo de verdade!</p>
+          <div class="flex gap-4 items-center mt-4 flex-wrap">
+            <div>
+              <label class="text-sm font-bold">Imagem:</label>
+              <select id="realimg-source" class="input" style="width:160px;">
+                <option value="star">⭐ Estrela</option>
+                <option value="smiley">🙂 Smiley</option>
+                <option value="arrow">➡️ Seta</option>
+                <option value="letterA">🔤 Letra A</option>
+                <option value="heart">❤️ Coração</option>
+                <option value="upload">📁 Upload...</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-sm font-bold">Tamanho:</label>
+              <select id="realimg-size" class="input" style="width:100px;">
+                <option value="8">8×8</option>
+                <option value="16" selected>16×16</option>
+                <option value="32">32×32</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-sm font-bold">Filtro:</label>
+              <select id="realimg-filter" class="input" style="width:160px;">
+                ${Object.entries(VisionEngine.FILTERS).map(([k, v]) =>
+                  `<option value="${k}">${v.label}</option>`
+                ).join('')}
+              </select>
+            </div>
+            <button class="btn btn-accent" id="realimg-run-btn">🔬 Processar</button>
+          </div>
+          <input type="file" id="realimg-upload" accept="image/*" class="hidden">
+        </div>
+        <div id="realimg-result" class="mt-4"></div>
       </div>
     `;
   }
@@ -347,6 +395,26 @@ const VisionDemo = (() => {
     // Learn tab - pixel grid demo
     renderPixelGridDemo();
 
+    // Real image tab
+    document.getElementById('realimg-run-btn')?.addEventListener('click', processRealImage);
+    document.getElementById('realimg-source')?.addEventListener('change', (e) => {
+      if (e.target.value === 'upload') {
+        document.getElementById('realimg-upload')?.click();
+      }
+    });
+    document.getElementById('realimg-upload')?.addEventListener('change', (e) => {
+      if (e.target.files?.[0]) {
+        uploadedImageFile = e.target.files[0];
+        const sel = document.getElementById('realimg-source');
+        // Add custom option showing filename
+        let opt = sel.querySelector('option[value="custom"]');
+        if (!opt) { opt = document.createElement('option'); opt.value = 'custom'; sel.appendChild(opt); }
+        opt.textContent = `📄 ${e.target.files[0].name.slice(0, 18)}`;
+        sel.value = 'custom';
+        Toast.show('Imagem carregada! Clique em 🔬 Processar.', 'success');
+      }
+    });
+
     // Convolution tab
     document.getElementById('conv-run-btn')?.addEventListener('click', runConvolution);
 
@@ -358,6 +426,444 @@ const VisionDemo = (() => {
 
     // Quiz
     document.getElementById('start-quiz-btn')?.addEventListener('click', startQuiz);
+  }
+
+  /* ---- Draw predefined images on canvas ---- */
+  function drawPredefinedImage(ctx, name, size) {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, size, size);
+
+    if (name === 'star') {
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      const cx = size / 2, cy = size / 2, r = size * 0.4, ri = size * 0.18;
+      for (let i = 0; i < 5; i++) {
+        const angle = (i * 72 - 90) * Math.PI / 180;
+        const angleInner = ((i * 72) + 36 - 90) * Math.PI / 180;
+        ctx.lineTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+        ctx.lineTo(cx + ri * Math.cos(angleInner), cy + ri * Math.sin(angleInner));
+      }
+      ctx.closePath();
+      ctx.fill();
+    } else if (name === 'smiley') {
+      const cx = size / 2, cy = size / 2, r = size * 0.38;
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(1, size / 16);
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(cx - r * 0.35, cy - r * 0.2, r * 0.1, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + r * 0.35, cy - r * 0.2, r * 0.1, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy + r * 0.05, r * 0.5, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
+    } else if (name === 'arrow') {
+      ctx.fillStyle = '#fff';
+      const m = size * 0.15, w = size * 0.22;
+      ctx.fillRect(m, size / 2 - w / 2, size * 0.5, w);
+      ctx.beginPath();
+      ctx.moveTo(size * 0.55, m);
+      ctx.lineTo(size - m, size / 2);
+      ctx.lineTo(size * 0.55, size - m);
+      ctx.closePath();
+      ctx.fill();
+    } else if (name === 'letterA') {
+      ctx.fillStyle = '#fff';
+      ctx.font = `bold ${Math.round(size * 0.8)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('A', size / 2, size / 2 + size * 0.05);
+    } else if (name === 'heart') {
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      const cx = size / 2, top = size * 0.3, s = size * 0.25;
+      ctx.moveTo(cx, size * 0.8);
+      ctx.bezierCurveTo(cx - size * 0.5, size * 0.45, cx - size * 0.45, top - s * 0.3, cx, top + s * 0.5);
+      ctx.bezierCurveTo(cx + size * 0.45, top - s * 0.3, cx + size * 0.5, size * 0.45, cx, size * 0.8);
+      ctx.fill();
+    }
+  }
+
+  /** Load image as pixel data at target size */
+  async function loadImagePixels(source, targetSize) {
+    const canvas = document.createElement('canvas');
+    canvas.width = targetSize;
+    canvas.height = targetSize;
+    const ctx = canvas.getContext('2d');
+
+    if (source === 'custom' && uploadedImageFile) {
+      // Load uploaded file
+      const img = new Image();
+      const url = URL.createObjectURL(uploadedImageFile);
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = url;
+      });
+      // Draw scaled to fit
+      const scale = Math.min(targetSize / img.width, targetSize / img.height);
+      const w = img.width * scale, h = img.height * scale;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, targetSize, targetSize);
+      ctx.drawImage(img, (targetSize - w) / 2, (targetSize - h) / 2, w, h);
+      URL.revokeObjectURL(url);
+    } else {
+      drawPredefinedImage(ctx, source, targetSize);
+    }
+
+    const imageData = ctx.getImageData(0, 0, targetSize, targetSize);
+    return { imageData, canvas, ctx };
+  }
+
+  /* =================== Process Real Image =================== */
+  async function processRealImage() {
+    const source = document.getElementById('realimg-source')?.value || 'star';
+    const targetSize = parseInt(document.getElementById('realimg-size')?.value) || 16;
+    const filterKey = document.getElementById('realimg-filter')?.value || 'edgeH';
+    const container = document.getElementById('realimg-result');
+    const btn = document.getElementById('realimg-run-btn');
+    if (!container) return;
+
+    if (source === 'upload') {
+      document.getElementById('realimg-upload')?.click();
+      return;
+    }
+
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Processando...'; }
+
+    const delay = (ms) => new Promise(r => setTimeout(r, ms));
+    container.innerHTML = '';
+
+    try {
+      const { imageData, canvas } = await loadImagePixels(source, targetSize);
+      const pixels = imageData.data; // RGBA flat array
+
+      // ======== STAGE 1: Original Image ========
+      const stage1 = document.createElement('div');
+      stage1.className = 'card-flat mb-4 real-pipeline-stage';
+      stage1.style.animation = 'fadeSlideIn 0.5s ease both';
+      stage1.innerHTML = `
+        <div class="flex items-center gap-3 mb-4">
+          <span style="font-size:1.8rem;">🖼️</span>
+          <div>
+            <h4 style="margin:0;">1. Imagem Original</h4>
+            <p class="text-sm text-muted" style="margin:0;">A imagem digital como o computador recebe — ${targetSize}×${targetSize} pixels</p>
+          </div>
+          <span class="ai-badge" style="margin-left:auto;">Real</span>
+        </div>
+        <div class="flex gap-6 items-start flex-wrap">
+          <div class="text-center">
+            <canvas id="realimg-canvas-orig" width="${targetSize}" height="${targetSize}" class="realimg-canvas"></canvas>
+            <p class="text-xs text-muted mt-1">${targetSize}×${targetSize} = ${targetSize * targetSize} pixels</p>
+          </div>
+          <div class="text-center">
+            <canvas id="realimg-canvas-zoom" width="${Math.min(targetSize * 12, 256)}" height="${Math.min(targetSize * 12, 256)}" class="realimg-canvas" style="border:1px solid var(--border);"></canvas>
+            <p class="text-xs text-muted mt-1">Zoom — cada quadrado = 1 pixel</p>
+          </div>
+        </div>`;
+      container.appendChild(stage1);
+
+      // Draw original
+      const origCanvas = document.getElementById('realimg-canvas-orig');
+      origCanvas.getContext('2d').putImageData(imageData, 0, 0);
+      // Draw zoomed
+      const zoomCanvas = document.getElementById('realimg-canvas-zoom');
+      const zctx = zoomCanvas.getContext('2d');
+      zctx.imageSmoothingEnabled = false;
+      zctx.drawImage(canvas, 0, 0, zoomCanvas.width, zoomCanvas.height);
+      // Draw grid on zoom
+      zctx.strokeStyle = 'rgba(100,100,100,0.3)';
+      zctx.lineWidth = 0.5;
+      const cellW = zoomCanvas.width / targetSize;
+      for (let i = 0; i <= targetSize; i++) {
+        zctx.beginPath(); zctx.moveTo(i * cellW, 0); zctx.lineTo(i * cellW, zoomCanvas.height); zctx.stroke();
+        zctx.beginPath(); zctx.moveTo(0, i * cellW); zctx.lineTo(zoomCanvas.width, i * cellW); zctx.stroke();
+      }
+
+      await delay(400);
+
+      // ======== STAGE 2: RGB Channels ========
+      const stage2 = document.createElement('div');
+      stage2.className = 'card-flat mb-4 real-pipeline-stage';
+      stage2.style.animation = 'fadeSlideIn 0.5s ease 0.1s both';
+      stage2.innerHTML = `
+        <div class="flex items-center gap-3 mb-4">
+          <span style="font-size:1.8rem;">🎨</span>
+          <div>
+            <h4 style="margin:0;">2. Canais RGB</h4>
+            <p class="text-sm text-muted" style="margin:0;">Cada pixel tem 3 valores: Vermelho (R), Verde (G) e Azul (B), de 0 a 255</p>
+          </div>
+        </div>
+        <div class="flex gap-4 items-start flex-wrap">
+          <div class="text-center">
+            <canvas id="realimg-ch-r" width="${targetSize}" height="${targetSize}" class="realimg-canvas-sm"></canvas>
+            <p class="text-xs mt-1" style="color:#ef4444;font-weight:bold;">Red</p>
+          </div>
+          <div class="text-center">
+            <canvas id="realimg-ch-g" width="${targetSize}" height="${targetSize}" class="realimg-canvas-sm"></canvas>
+            <p class="text-xs mt-1" style="color:#22c55e;font-weight:bold;">Green</p>
+          </div>
+          <div class="text-center">
+            <canvas id="realimg-ch-b" width="${targetSize}" height="${targetSize}" class="realimg-canvas-sm"></canvas>
+            <p class="text-xs mt-1" style="color:#3b82f6;font-weight:bold;">Blue</p>
+          </div>
+        </div>
+        <p class="text-xs text-muted mt-3">Exemplo pixel (0,0): R=${pixels[0]}, G=${pixels[1]}, B=${pixels[2]}, A=${pixels[3]}</p>`;
+      container.appendChild(stage2);
+
+      // Draw channels
+      ['r', 'g', 'b'].forEach((ch, ci) => {
+        const chCanvas = document.getElementById(`realimg-ch-${ch}`);
+        const chCtx = chCanvas.getContext('2d');
+        const chData = chCtx.createImageData(targetSize, targetSize);
+        for (let i = 0; i < targetSize * targetSize; i++) {
+          const v = pixels[i * 4 + ci];
+          chData.data[i * 4 + 0] = ci === 0 ? v : 0;
+          chData.data[i * 4 + 1] = ci === 1 ? v : 0;
+          chData.data[i * 4 + 2] = ci === 2 ? v : 0;
+          chData.data[i * 4 + 3] = 255;
+        }
+        chCtx.putImageData(chData, 0, 0);
+      });
+
+      await delay(400);
+
+      // ======== STAGE 3: Grayscale Conversion ========
+      const grayscale = new Array(targetSize * targetSize);
+      for (let i = 0; i < grayscale.length; i++) {
+        const r = pixels[i * 4], g = pixels[i * 4 + 1], b = pixels[i * 4 + 2];
+        grayscale[i] = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+      }
+
+      const stage3 = document.createElement('div');
+      stage3.className = 'card-flat mb-4 real-pipeline-stage';
+      stage3.style.animation = 'fadeSlideIn 0.5s ease 0.1s both';
+      stage3.innerHTML = `
+        <div class="flex items-center gap-3 mb-4">
+          <span style="font-size:1.8rem;">⬛</span>
+          <div>
+            <h4 style="margin:0;">3. Conversão Grayscale</h4>
+            <p class="text-sm text-muted" style="margin:0;">Fórmula: Gray = 0.299×R + 0.587×G + 0.114×B (ponderada pela percepção humana)</p>
+          </div>
+        </div>
+        <div class="flex gap-6 items-start flex-wrap">
+          <div class="text-center">
+            <canvas id="realimg-gray" width="${targetSize}" height="${targetSize}" class="realimg-canvas-sm"></canvas>
+            <p class="text-xs text-muted mt-1">Grayscale</p>
+          </div>
+          <div class="text-center">
+            <canvas id="realimg-gray-zoom" width="${Math.min(targetSize * 10, 220)}" height="${Math.min(targetSize * 10, 220)}" class="realimg-canvas"></canvas>
+            <p class="text-xs text-muted mt-1">Zoom com valores</p>
+          </div>
+        </div>`;
+      container.appendChild(stage3);
+
+      // Draw grayscale
+      const grayCanvas = document.getElementById('realimg-gray');
+      const gctx = grayCanvas.getContext('2d');
+      const grayData = gctx.createImageData(targetSize, targetSize);
+      for (let i = 0; i < grayscale.length; i++) {
+        const v = grayscale[i];
+        grayData.data[i * 4] = v;
+        grayData.data[i * 4 + 1] = v;
+        grayData.data[i * 4 + 2] = v;
+        grayData.data[i * 4 + 3] = 255;
+      }
+      gctx.putImageData(grayData, 0, 0);
+
+      // Draw grayscale zoomed with values
+      const gzCanvas = document.getElementById('realimg-gray-zoom');
+      const gzCtx = gzCanvas.getContext('2d');
+      gzCtx.imageSmoothingEnabled = false;
+      const gzCell = gzCanvas.width / targetSize;
+      for (let y = 0; y < targetSize; y++) {
+        for (let x = 0; x < targetSize; x++) {
+          const v = grayscale[y * targetSize + x];
+          gzCtx.fillStyle = `rgb(${v},${v},${v})`;
+          gzCtx.fillRect(x * gzCell, y * gzCell, gzCell, gzCell);
+          if (gzCell >= 12) {
+            gzCtx.fillStyle = v > 128 ? '#000' : '#fff';
+            gzCtx.font = `${Math.min(gzCell * 0.55, 11)}px monospace`;
+            gzCtx.textAlign = 'center'; gzCtx.textBaseline = 'middle';
+            gzCtx.fillText(v.toString(), x * gzCell + gzCell / 2, y * gzCell + gzCell / 2);
+          }
+        }
+      }
+      // Grid
+      gzCtx.strokeStyle = 'rgba(100,100,100,0.25)'; gzCtx.lineWidth = 0.5;
+      for (let i = 0; i <= targetSize; i++) {
+        gzCtx.beginPath(); gzCtx.moveTo(i * gzCell, 0); gzCtx.lineTo(i * gzCell, gzCanvas.height); gzCtx.stroke();
+        gzCtx.beginPath(); gzCtx.moveTo(0, i * gzCell); gzCtx.lineTo(gzCanvas.width, i * gzCell); gzCtx.stroke();
+      }
+
+      await delay(400);
+
+      // ======== STAGE 4: Pixel Matrix ========
+      const maxShow = Math.min(targetSize, 12);
+      const stage4 = document.createElement('div');
+      stage4.className = 'card-flat mb-4 real-pipeline-stage';
+      stage4.style.animation = 'fadeSlideIn 0.5s ease 0.1s both';
+      stage4.innerHTML = `
+        <div class="flex items-center gap-3 mb-4">
+          <span style="font-size:1.8rem;">🔢</span>
+          <div>
+            <h4 style="margin:0;">4. Matriz Numérica</h4>
+            <p class="text-sm text-muted" style="margin:0;">Isso é o que o computador realmente "vê" — uma matriz de números de 0 a 255</p>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="realimg-matrix">
+            <tbody>
+              ${Array.from({length: maxShow}, (_, y) =>
+                `<tr>${Array.from({length: maxShow}, (_, x) => {
+                  const v = grayscale[y * targetSize + x];
+                  const bg = `rgb(${v},${v},${v})`;
+                  const fg = v > 128 ? '#000' : '#fff';
+                  return `<td style="background:${bg};color:${fg};">${v}</td>`;
+                }).join('')}${targetSize > maxShow ? '<td class="text-muted" style="border:none;">…</td>' : ''}</tr>`
+              ).join('')}
+              ${targetSize > maxShow ? `<tr>${Array.from({length: maxShow + 1}, () => '<td style="border:none;" class="text-muted">⋮</td>').join('')}</tr>` : ''}
+            </tbody>
+          </table>
+        </div>
+        <p class="text-xs text-muted mt-2">Matriz ${targetSize}×${targetSize} = ${targetSize * targetSize} valores${targetSize > maxShow ? ` (mostrando ${maxShow}×${maxShow})` : ''}</p>`;
+      container.appendChild(stage4);
+
+      await delay(400);
+
+      // ======== STAGE 5: Convolution ========
+      const filter = VisionEngine.FILTERS[filterKey];
+      const convResult = VisionEngine.convolve2D(grayscale, targetSize, filter.kernel);
+      const convNorm = VisionEngine.normalize(convResult.data);
+
+      const stage5 = document.createElement('div');
+      stage5.className = 'card-flat mb-4 real-pipeline-stage';
+      stage5.style.animation = 'fadeSlideIn 0.5s ease 0.1s both';
+
+      // Draw convolution result on canvas
+      stage5.innerHTML = `
+        <div class="flex items-center gap-3 mb-4">
+          <span style="font-size:1.8rem;">🔲</span>
+          <div>
+            <h4 style="margin:0;">5. Convolução — ${filter.label}</h4>
+            <p class="text-sm text-muted" style="margin:0;">${filter.desc}. Kernel 3×3 desliza sobre a matriz.</p>
+          </div>
+        </div>
+        <div class="flex gap-6 items-start flex-wrap">
+          <div>
+            <span class="text-xs font-bold">Kernel:</span>
+            <div class="mt-1">${renderKernelGrid(filter.kernel, filter.color)}</div>
+          </div>
+          <div class="text-center">
+            <span class="text-xs font-bold">Antes (Grayscale)</span>
+            <canvas id="realimg-pre-conv" width="${Math.min(targetSize * 8, 180)}" height="${Math.min(targetSize * 8, 180)}" class="realimg-canvas mt-1"></canvas>
+          </div>
+          <div style="display:flex;align-items:center;font-size:1.5rem;color:var(--primary);font-weight:bold;">→</div>
+          <div class="text-center">
+            <span class="text-xs font-bold" style="color:${filter.color};">Depois (${filter.label})</span>
+            <canvas id="realimg-post-conv" width="${Math.min(convResult.size * 8, 180)}" height="${Math.min(convResult.size * 8, 180)}" class="realimg-canvas mt-1"></canvas>
+          </div>
+        </div>
+        <p class="text-xs text-muted mt-3">Output: ${convResult.size}×${convResult.size} = ${convResult.data.length} valores (${targetSize}−3+1 = ${convResult.size} por dimensão)</p>`;
+      container.appendChild(stage5);
+
+      // Draw pre/post convolution canvases
+      const preC = document.getElementById('realimg-pre-conv');
+      const preCCtx = preC.getContext('2d');
+      preCCtx.imageSmoothingEnabled = false;
+      preCCtx.drawImage(grayCanvas, 0, 0, preC.width, preC.height);
+
+      const postC = document.getElementById('realimg-post-conv');
+      const postCtx = postC.getContext('2d');
+      const postImgData = postCtx.createImageData(convResult.size, convResult.size);
+      for (let i = 0; i < convNorm.length; i++) {
+        const v = convNorm[i];
+        postImgData.data[i * 4] = v;
+        postImgData.data[i * 4 + 1] = v;
+        postImgData.data[i * 4 + 2] = v;
+        postImgData.data[i * 4 + 3] = 255;
+      }
+      const tmpC = document.createElement('canvas');
+      tmpC.width = convResult.size; tmpC.height = convResult.size;
+      tmpC.getContext('2d').putImageData(postImgData, 0, 0);
+      postCtx.imageSmoothingEnabled = false;
+      postCtx.drawImage(tmpC, 0, 0, postC.width, postC.height);
+
+      await delay(400);
+
+      // ======== STAGE 6: ReLU + MaxPool ========
+      const reluData = VisionEngine.relu(convResult.data);
+      const poolResult = VisionEngine.maxPool2D(reluData, convResult.size, 2);
+      const reluNorm = VisionEngine.normalize(reluData);
+      const poolNorm = VisionEngine.normalize(poolResult.data);
+
+      const stage6 = document.createElement('div');
+      stage6.className = 'card-flat mb-4 real-pipeline-stage';
+      stage6.style.animation = 'fadeSlideIn 0.5s ease 0.1s both';
+      stage6.innerHTML = `
+        <div class="flex items-center gap-3 mb-4">
+          <span style="font-size:1.8rem;">⚡</span>
+          <div>
+            <h4 style="margin:0;">6. ReLU + MaxPool</h4>
+            <p class="text-sm text-muted" style="margin:0;">ReLU zera negativos, MaxPool reduz dimensão mantendo features mais fortes.</p>
+          </div>
+        </div>
+        <div class="flex gap-4 items-start flex-wrap">
+          <div class="text-center">
+            <span class="text-xs font-bold">Após ReLU (${convResult.size}×${convResult.size})</span>
+            <canvas id="realimg-relu" width="${Math.min(convResult.size * 8, 160)}" height="${Math.min(convResult.size * 8, 160)}" class="realimg-canvas mt-1"></canvas>
+            <p class="text-xs text-muted mt-1">max(0, x)</p>
+          </div>
+          <div style="display:flex;align-items:center;font-size:1.5rem;color:var(--primary);font-weight:bold;">→</div>
+          <div class="text-center">
+            <span class="text-xs font-bold">Após MaxPool 2×2 (${poolResult.size}×${poolResult.size})</span>
+            <canvas id="realimg-pool" width="${Math.min(poolResult.size * 14, 160)}" height="${Math.min(poolResult.size * 14, 160)}" class="realimg-canvas mt-1"></canvas>
+            <p class="text-xs text-muted mt-1">${convResult.size}×${convResult.size} → ${poolResult.size}×${poolResult.size}</p>
+          </div>
+        </div>
+        <div class="card-flat mt-4" style="background:var(--surface);">
+          <div class="text-xs font-bold mb-2">📊 Resumo do Pipeline:</div>
+          <div class="flex gap-4 flex-wrap text-xs">
+            <span>🖼️ Input: ${targetSize}×${targetSize}</span>
+            <span>→ 🔲 Conv: ${convResult.size}×${convResult.size}</span>
+            <span>→ ⚡ ReLU: ${convResult.size}×${convResult.size}</span>
+            <span>→ 📉 Pool: ${poolResult.size}×${poolResult.size}</span>
+            <span>• Redução: ${targetSize * targetSize} → ${poolResult.data.length} valores (${((1 - poolResult.data.length / (targetSize * targetSize)) * 100).toFixed(0)}% menos)</span>
+          </div>
+        </div>`;
+      container.appendChild(stage6);
+
+      // Draw ReLU canvas
+      drawGrayToCanvas('realimg-relu', reluNorm, convResult.size);
+      // Draw Pool canvas
+      drawGrayToCanvas('realimg-pool', poolNorm, poolResult.size);
+
+    } catch (err) {
+      container.innerHTML = `
+        <div class="card-flat config-test-error">
+          <strong style="color:#ef4444;">❌ Erro:</strong>
+          <p class="text-sm mt-2">${err.message}</p>
+        </div>`;
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '🔬 Processar'; }
+    }
+  }
+
+  /** Draw normalized grayscale data to a canvas by ID (scaled up) */
+  function drawGrayToCanvas(canvasId, normData, dataSize) {
+    const c = document.getElementById(canvasId);
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    const tmpC = document.createElement('canvas');
+    tmpC.width = dataSize; tmpC.height = dataSize;
+    const tmpCtx = tmpC.getContext('2d');
+    const imgData = tmpCtx.createImageData(dataSize, dataSize);
+    for (let i = 0; i < normData.length; i++) {
+      const v = normData[i];
+      imgData.data[i * 4] = v;
+      imgData.data[i * 4 + 1] = v;
+      imgData.data[i * 4 + 2] = v;
+      imgData.data[i * 4 + 3] = 255;
+    }
+    tmpCtx.putImageData(imgData, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(tmpC, 0, 0, c.width, c.height);
   }
 
   /* =================== Pixel Grid Demo =================== */

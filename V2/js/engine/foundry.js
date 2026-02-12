@@ -264,6 +264,87 @@ const FoundryService = (() => {
     };
   }
 
+  /* ---- Image Generation ---- */
+  async function generateImage(prompt, options = {}) {
+    const config = getConfig();
+    if (!isConfigured()) {
+      throw new Error('API não configurada. Vá em ⚙️ Configurações para adicionar sua chave.');
+    }
+
+    // Image deployment name — from config.local.js or fallback
+    const imageModel = options.imageModel || 'gpt-image-1.5';
+    const size = options.size || '1024x1024';
+    const quality = options.quality || 'auto';
+    const n = options.n || 1;
+
+    let url, headers;
+
+    if (config.provider === 'azure-foundry') {
+      const base = config.endpoint.replace(/\/+$/, '');
+      url = `${base}/openai/deployments/${imageModel}/images/generations?api-version=2025-04-01-preview`;
+      headers = {
+        'Content-Type': 'application/json',
+        'api-key': config.apiKey,
+      };
+    } else if (config.provider === 'openai') {
+      const base = config.endpoint?.replace(/\/+$/, '') || 'https://api.openai.com';
+      url = `${base}/v1/images/generations`;
+      headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`,
+      };
+    } else {
+      throw new Error('Geração de imagem não suportada neste provider.');
+    }
+
+    const body = { prompt, n, size, quality };
+
+    // For OpenAI direct, include model in body
+    if (config.provider !== 'azure-foundry') {
+      body.model = imageModel;
+    }
+
+    // Request b64_json to avoid CORS issues with temporary URLs
+    body.output_format = 'png';
+
+    const startTime = performance.now();
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      const elapsed = Math.round(performance.now() - startTime);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMsg = errorData.error?.message || response.statusText || `HTTP ${response.status}`;
+        throw new Error(`API Error (${response.status}): ${errorMsg}`);
+      }
+
+      const data = await response.json();
+      const images = (data.data || []).map(img => ({
+        b64: img.b64_json || null,
+        url: img.url || null,
+        revisedPrompt: img.revised_prompt || prompt,
+      }));
+
+      return {
+        images,
+        elapsed,
+        provider: config.provider,
+        model: imageModel,
+      };
+    } catch (err) {
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        throw new Error('Erro de rede. Verifique o endpoint e sua conexão.');
+      }
+      throw err;
+    }
+  }
+
   /* ---- Convenience Methods ---- */
   async function ask(prompt, systemPrompt = 'Você é um assistente especialista em IA e machine learning. Responda de forma clara e concisa em português.') {
     const messages = [
@@ -294,6 +375,7 @@ const FoundryService = (() => {
       'prompt-engineering': 'Você é um especialista em prompt engineering. Explique técnicas, padrões, otimizações.',
       rag: 'Você é um especialista em RAG. Explique retrieval, augmentation, geração com contexto.',
       agents: 'Você é um especialista em AI Agents. Explique loops, ferramentas, padrões como ReAct.',
+      'image-gen': 'Você é um especialista em geração de imagens por IA. Explique difusão, DALL-E, VAE, CLIP, arquiteturas.',
     };
 
     const sys = systemPrompts[module] || 'Você é um assistente especialista em IA. Responda em português.';
@@ -309,6 +391,7 @@ const FoundryService = (() => {
     isConfigured,
     chatCompletion,
     streamChatCompletion,
+    generateImage,
     ask,
     testConnection,
     generateForModule,

@@ -102,6 +102,14 @@ const MODULES = [
     route: '/agents',
     color: '#f97316',
   },
+  {
+    id: 'image-gen',
+    emoji: '🎨',
+    title: 'Geração de Imagens',
+    desc: 'Como IA cria imagens do zero — difusão, DALL·E e geração real',
+    route: '/image-gen',
+    color: '#e11d48',
+  },
 ];
 
 /* ---- Router ---- */
@@ -184,6 +192,11 @@ const Router = (() => {
         app.innerHTML = AgentsDemo.render();
         Progress.visitModule('agents');
         AgentsDemo.initInteractions();
+        break;
+      case '/image-gen':
+        app.innerHTML = ImageGenDemo.render();
+        Progress.visitModule('image-gen');
+        ImageGenDemo.initInteractions();
         break;
       case '/profile':
         app.innerHTML = Pages.profile();
