@@ -149,6 +149,121 @@ const FoundryService = (() => {
     }
   }
 
+  /* ---- Streaming + Logprobs ---- */
+  async function streamChatCompletion(messages, options = {}, onToken) {
+    const config = getConfig();
+    if (!isConfigured()) {
+      throw new Error('API não configurada. Vá em ⚙️ Configurações para adicionar sua chave.');
+    }
+
+    const provider = PROVIDERS[config.provider];
+    if (!provider) throw new Error(`Provider "${config.provider}" não suportado.`);
+
+    const url = provider.buildUrl(config);
+    const headers = provider.headers(config);
+
+    const body = {
+      messages,
+      temperature: options.temperature ?? config.temperature,
+      max_completion_tokens: options.maxTokens ?? config.maxTokens,
+      stream: true,
+      stream_options: { include_usage: true },
+    };
+
+    if (options.logprobs) {
+      body.logprobs = true;
+      body.top_logprobs = options.topLogprobs ?? 5;
+    }
+
+    if (config.provider !== 'azure-foundry') {
+      body.model = config.model;
+    }
+
+    const startTime = performance.now();
+    let fullContent = '';
+    let usage = {};
+    let model = config.model;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMsg = errorData.error?.message || response.statusText || `HTTP ${response.status}`;
+      throw new Error(`API Error (${response.status}): ${errorMsg}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+        const dataStr = trimmed.slice(6);
+        if (dataStr === '[DONE]') continue;
+
+        try {
+          const chunk = JSON.parse(dataStr);
+          if (chunk.model) model = chunk.model;
+          if (chunk.usage) usage = chunk.usage;
+
+          const choice = chunk.choices?.[0];
+          if (!choice) continue;
+
+          const content = choice.delta?.content;
+          if (content) {
+            fullContent += content;
+            const tokenData = {
+              content,
+              fullContent,
+              logprobs: null,
+            };
+
+            // Extract logprobs if available
+            const lp = choice.logprobs?.content;
+            if (lp && lp.length > 0) {
+              tokenData.logprobs = {
+                token: lp[0].token,
+                logprob: lp[0].logprob,
+                prob: Math.exp(lp[0].logprob),
+                topLogprobs: (lp[0].top_logprobs || []).map(t => ({
+                  token: t.token,
+                  logprob: t.logprob,
+                  prob: Math.exp(t.logprob),
+                })),
+              };
+            }
+
+            if (onToken) onToken(tokenData);
+          }
+        } catch (e) { /* skip malformed chunks */ }
+      }
+    }
+
+    const elapsed = Math.round(performance.now() - startTime);
+
+    return {
+      content: fullContent,
+      role: 'assistant',
+      model,
+      usage,
+      elapsed,
+      provider: config.provider,
+    };
+  }
+
   /* ---- Convenience Methods ---- */
   async function ask(prompt, systemPrompt = 'Você é um assistente especialista em IA e machine learning. Responda de forma clara e concisa em português.') {
     const messages = [
@@ -193,6 +308,7 @@ const FoundryService = (() => {
     clearConfig,
     isConfigured,
     chatCompletion,
+    streamChatCompletion,
     ask,
     testConnection,
     generateForModule,

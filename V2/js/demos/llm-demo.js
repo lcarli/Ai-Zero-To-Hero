@@ -119,16 +119,19 @@ const LLMDemo = (() => {
   }
 
   function renderPipelineTab() {
+    const aiReady = typeof FoundryService !== 'undefined' && FoundryService.isConfigured();
     return `
       <div class="pipeline-section">
         <div class="card-flat mb-4">
           <h3>🔄 Visualize o Pipeline</h3>
           <p class="text-sm text-muted">Digite um texto e veja cada estágio do processamento.</p>
-          <div class="flex gap-4 items-center mt-4">
+          <div class="flex gap-4 items-center mt-4 flex-wrap">
             <input id="pipeline-input" class="input" value="The cat sat on" 
               placeholder="Digite um texto..." style="flex:1;min-width:200px;">
             <button class="btn btn-primary" id="pipeline-run-btn">Processar</button>
+            <button class="btn ${aiReady ? 'btn-accent' : 'btn-ghost'}" id="pipeline-real-btn" ${!aiReady ? 'disabled title="Configure a API em ⚙️ Configurações"' : ''}>⚡ Pipeline Real</button>
           </div>
+          ${!aiReady ? '<p class="text-xs text-muted mt-2">💡 <a href="#/settings" style="color:var(--primary);">Configure uma API</a> para o pipeline com IA real.</p>' : ''}
         </div>
         <div id="pipeline-container" class="mt-4"></div>
       </div>
@@ -353,6 +356,7 @@ const LLMDemo = (() => {
   function initInteractions() {
     // Pipeline
     document.getElementById('pipeline-run-btn')?.addEventListener('click', runPipeline);
+    document.getElementById('pipeline-real-btn')?.addEventListener('click', runRealPipeline);
 
     // Generate
     document.getElementById('gen-run-btn')?.addEventListener('click', runGeneration);
@@ -458,6 +462,225 @@ const LLMDemo = (() => {
     container.innerHTML = html;
   }
 
+  /* =================== Real Pipeline (via API) =================== */
+
+  async function runRealPipeline() {
+    const input = document.getElementById('pipeline-input');
+    const text = input?.value?.trim();
+    if (!text) return;
+
+    if (!FoundryService.isConfigured()) {
+      Toast.show('Configure a API em ⚙️ Configurações primeiro.', 'error');
+      return;
+    }
+
+    const container = document.getElementById('pipeline-container');
+    const btn = document.getElementById('pipeline-real-btn');
+    if (!container) return;
+
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Processando...'; }
+
+    // Simulated tokens for display (BPE approximation)
+    const simTokens = text.match(/\S+|\s+/g) || [text];
+
+    container.innerHTML = '';
+
+    // Utility: create & animate a stage
+    function addStage(icon, name, desc, delay) {
+      const div = document.createElement('div');
+      div.className = 'card-flat mb-4 pipeline-stage real-pipeline-stage';
+      div.style.animation = `fadeSlideIn 0.5s ease ${delay}s both`;
+      div.innerHTML = `<div class="flex items-center gap-3 mb-4">
+        <span style="font-size:1.8rem;">${icon}</span>
+        <div>
+          <h4 style="margin:0;">${name}</h4>
+          <p class="text-sm text-muted" style="margin:0;">${desc}</p>
+        </div>
+        <span class="ai-badge" style="margin-left:auto;">⚡ Real</span>
+      </div>
+      <div class="stage-content"></div>`;
+      container.appendChild(div);
+      return div.querySelector('.stage-content');
+    }
+
+    const delay = (ms) => new Promise(r => setTimeout(r, ms));
+
+    try {
+      // === Stage 1: Tokenization ===
+      const s1 = addStage('🧩', 'Tokenização (BPE)', 'O texto é dividido em subpalavras chamadas tokens.', 0);
+      await delay(300);
+      s1.innerHTML = `
+        <div class="flex flex-wrap gap-2 mb-3">
+          ${simTokens.map((t, i) => `
+            <div class="token-chip real-token" style="--chip-color:var(--primary);animation:tokenPop 0.3s ease ${i * 0.08}s both;">
+              <span>${escapeHtml(t.trim() || '⎵')}</span>
+              <span class="text-xs" style="opacity:0.7;">≈ID ${(i * 347 + 1024) % 50257}</span>
+            </div>`).join('')}
+        </div>
+        <p class="text-xs text-muted">≈ ${simTokens.length} tokens aproximados. O modelo usa BPE — o contagem real será exibida na resposta.</p>`;
+      await delay(600);
+
+      // === Stage 2: Embeddings + Positional ===
+      const s2 = addStage('📐', 'Embedding + Positional Encoding', 'Cada token ID vira um vetor de alta dimensão. Positional encoding injeta a posição na sequência.', 0.2);
+      await delay(300);
+      const dims = 12288; // GPT-3/4 class
+      s2.innerHTML = `
+        <div style="overflow-x:auto;">
+          <table class="attn-step-table">
+            <thead><tr><th>Token</th><th>Vetor de Embedding (${dims}D, amostra)</th><th>Pos.</th></tr></thead>
+            <tbody>
+            ${simTokens.slice(0, 10).map((t, i) => {
+              const sample = Array.from({length:6}, () => (Math.random() * 2 - 1).toFixed(3));
+              return `<tr style="animation:fadeSlideIn 0.3s ease ${i * 0.06}s both;">
+                <td class="font-bold">${escapeHtml(t.trim() || '⎵')}</td>
+                <td class="font-mono text-xs">[${sample.join(', ')}, …]</td>
+                <td class="font-mono text-xs">${i}</td>
+              </tr>`;
+            }).join('')}
+            </tbody>
+          </table>
+        </div>
+        <p class="text-xs text-muted mt-2">Vetores reais de ${dims} dimensões — aqui exibimos uma amostra de 6 dimensões para didática.</p>`;
+      await delay(600);
+
+      // === Stage 3: Transformer Blocks ===
+      const s3 = addStage('🔄', 'Transformer Blocks', 'A sequência passa por N camadas de self-attention + feed-forward. Cada camada refina a representação.', 0.2);
+      await delay(300);
+      const numLayers = 96;
+      const layersToShow = [1, 2, 3, 24, 48, 72, 95, numLayers];
+      s3.innerHTML = `
+        <div class="real-transformer-stack">
+          ${layersToShow.map((layer, i) => `
+            <div class="real-transformer-layer" style="animation:layerProcess 0.6s ease ${i * 0.15}s both;">
+              <div class="layer-header">
+                <span class="text-xs font-bold text-primary">Layer ${layer}/${numLayers}</span>
+                <div class="layer-progress-bar">
+                  <div class="layer-progress-fill" style="width:${(layer / numLayers * 100).toFixed(0)}%;animation:layerFill 0.8s ease ${i * 0.15 + 0.3}s both;"></div>
+                </div>
+              </div>
+              <div class="llm-layer-ops">
+                <span class="llm-op-badge">Multi-Head Attention</span>
+                <span class="llm-op-badge">Add & Norm</span>
+                <span class="llm-op-badge">Feed-Forward (MLP)</span>
+                <span class="llm-op-badge">Add & Norm</span>
+              </div>
+            </div>
+            ${i < layersToShow.length - 1 && layersToShow[i + 1] - layer > 1 ? '<div class="layer-skip">⋮</div>' : ''}
+          `).join('')}
+        </div>
+        <p class="text-xs text-muted mt-2">Modelo real com ~${numLayers} camadas. As operações acontecem dentro do modelo — aqui visualizamos o conceito.</p>`;
+      await delay(800);
+
+      // === Stage 4: Real Generation with Logprobs ===
+      const s4 = addStage('📊', 'Linear + Softmax → Próximo Token (Real)', 'O modelo projeta para o vocabulário e retorna probabilidades reais. Geração em streaming.', 0.2);
+      await delay(300);
+
+      // Container for streaming tokens + logprobs
+      s4.innerHTML = `
+        <div class="real-gen-output mb-4">
+          <div class="card-flat" style="border-color:var(--primary-alpha);background:var(--bg-secondary);">
+            <div class="flex items-center gap-3 mb-3">
+              <span class="text-xs text-muted">Texto gerado (streaming):</span>
+              <div class="stream-indicator"><span class="stream-dot"></span> ao vivo</div>
+            </div>
+            <div class="gen-text" id="real-pipeline-text">
+              <span class="gen-prompt">${escapeHtml(text)}</span><span class="gen-cursor">▊</span>
+            </div>
+          </div>
+        </div>
+        <div class="text-xs font-bold text-primary mb-2">Probabilidades por token (logprobs reais):</div>
+        <div id="real-pipeline-logprobs" class="real-logprobs-container"></div>
+        <div id="real-pipeline-stats" class="mt-3"></div>`;
+
+      const textEl = document.getElementById('real-pipeline-text');
+      const logprobsEl = document.getElementById('real-pipeline-logprobs');
+      const statsEl = document.getElementById('real-pipeline-stats');
+      let tokenCount = 0;
+
+      const result = await FoundryService.streamChatCompletion(
+        [
+          { role: 'system', content: 'Você continua textos de forma natural. Continue diretamente sem explicações. Máximo 80 palavras.' },
+          { role: 'user', content: `Continue este texto: "${text}"` },
+        ],
+        { maxTokens: 120, logprobs: true, topLogprobs: 5, temperature: 0.7 },
+        (tokenData) => {
+          tokenCount++;
+          // Add token to streaming text
+          if (textEl) {
+            const cursor = textEl.querySelector('.gen-cursor');
+            const span = document.createElement('span');
+            span.className = 'gen-word stream-token';
+            span.textContent = tokenData.content;
+            span.style.animation = 'tokenFadeIn 0.25s ease both';
+            textEl.insertBefore(span, cursor);
+          }
+
+          // Add logprob card
+          if (logprobsEl && tokenData.logprobs) {
+            const lp = tokenData.logprobs;
+            const pct = (lp.prob * 100);
+            const topAlts = lp.topLogprobs.slice(0, 5);
+            const maxProb = Math.max(...topAlts.map(t => t.prob));
+
+            const card = document.createElement('div');
+            card.className = 'real-logprob-card';
+            card.style.animation = `fadeSlideIn 0.3s ease both`;
+            card.innerHTML = `
+              <div class="logprob-header">
+                <span class="logprob-token-chosen">${escapeHtml(lp.token)}</span>
+                <span class="logprob-prob ${pct > 80 ? 'high' : pct > 30 ? 'mid' : 'low'}">${pct.toFixed(1)}%</span>
+              </div>
+              <div class="logprob-alternatives">
+                ${topAlts.map(t => {
+                  const altPct = (t.prob * 100);
+                  const barW = (t.prob / maxProb * 100).toFixed(0);
+                  const isChosen = t.token === lp.token;
+                  return `<div class="logprob-alt ${isChosen ? 'chosen' : ''}">
+                    <span class="logprob-alt-token">${escapeHtml(t.token)}</span>
+                    <div class="progress-bar" style="flex:1;height:8px;">
+                      <div class="progress-fill" style="width:${barW}%;background:${isChosen ? 'var(--accent)' : 'var(--primary)'};"></div>
+                    </div>
+                    <span class="logprob-alt-pct">${altPct.toFixed(1)}%</span>
+                  </div>`;
+                }).join('')}
+              </div>`;
+            logprobsEl.appendChild(card);
+            // Scroll to latest
+            logprobsEl.scrollTop = logprobsEl.scrollHeight;
+          }
+        }
+      );
+
+      // Remove cursor, add final stats
+      textEl?.querySelector('.gen-cursor')?.remove();
+      const indicator = container.querySelector('.stream-indicator');
+      if (indicator) indicator.innerHTML = '✅ concluído';
+
+      if (statsEl) {
+        statsEl.innerHTML = `
+          <div class="card-flat" style="border-color:var(--accent-alpha);">
+            <div class="flex flex-wrap gap-6">
+              <div><span class="text-xs text-muted">Modelo:</span><br><strong>${result.model}</strong></div>
+              <div><span class="text-xs text-muted">Tokens prompt:</span><br><strong>${result.usage?.prompt_tokens || '?'}</strong></div>
+              <div><span class="text-xs text-muted">Tokens gerados:</span><br><strong>${result.usage?.completion_tokens || tokenCount}</strong></div>
+              <div><span class="text-xs text-muted">Total:</span><br><strong>${result.usage?.total_tokens || '?'}</strong></div>
+              <div><span class="text-xs text-muted">Tempo:</span><br><strong>${result.elapsed}ms</strong></div>
+              <div><span class="text-xs text-muted">Tokens/s:</span><br><strong>${((result.usage?.completion_tokens || tokenCount) / (result.elapsed / 1000)).toFixed(1)}</strong></div>
+            </div>
+          </div>`;
+      }
+
+    } catch (err) {
+      container.innerHTML += `
+        <div class="card-flat config-test-error mt-4">
+          <strong style="color:#ef4444;">❌ Erro:</strong>
+          <p class="text-sm mt-2">${escapeHtml(err.message)}</p>
+        </div>`;
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '⚡ Pipeline Real'; }
+    }
+  }
+
   /* =================== Generation =================== */
 
   function runGeneration() {
@@ -546,7 +769,7 @@ const LLMDemo = (() => {
     if (stopBtn) stopBtn.disabled = true;
   }
 
-  /* =================== AI Real Generation =================== */
+  /* =================== AI Real Generation (Streaming + Logprobs) =================== */
   async function runAIGeneration() {
     const input = document.getElementById('gen-input');
     const text = input?.value?.trim();
@@ -562,33 +785,92 @@ const LLMDemo = (() => {
     if (!outputEl) return;
 
     const aiBtn = document.getElementById('gen-ai-btn');
+    const stopBtn = document.getElementById('gen-stop-btn');
+    const runBtn = document.getElementById('gen-run-btn');
     if (aiBtn) { aiBtn.disabled = true; aiBtn.textContent = '⏳ Gerando...'; }
+    if (runBtn) runBtn.disabled = true;
+    if (stopBtn) stopBtn.disabled = true;
 
     outputEl.innerHTML = `
-      <div class="card-flat config-test-loading">
-        <div class="spinner"></div>
-        <span>Enviando prompt para o modelo real...</span>
+      <div class="card-flat" style="border-color:var(--primary-alpha);">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="ai-badge">⚡ IA Real — Streaming</span>
+          <div class="stream-indicator"><span class="stream-dot"></span> ao vivo</div>
+        </div>
+        <div class="gen-text" id="gen-text">
+          <span class="gen-prompt">${escapeHtml(text)}</span>
+          <span class="gen-cursor">▊</span>
+        </div>
       </div>`;
-    if (stepsEl) stepsEl.innerHTML = '';
+    if (stepsEl) stepsEl.innerHTML = '<div class="text-xs font-bold text-primary mb-2">Tokens gerados com probabilidades reais:</div>';
+
+    let tokenCount = 0;
 
     try {
-      const systemPrompt = `Você é um assistente que continua textos. O usuário vai fornecer o início de um texto e você deve continuar de forma natural e coerente. Continue o texto diretamente, sem explicações. Máximo 150 palavras.`;
-      const result = await FoundryService.chatCompletion([
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Continue este texto: "${text}"` },
-      ], { maxTokens: 200 });
+      const result = await FoundryService.streamChatCompletion(
+        [
+          { role: 'system', content: 'Você continua textos de forma natural. Continue diretamente sem explicações. Máximo 150 palavras.' },
+          { role: 'user', content: `Continue este texto: "${text}"` },
+        ],
+        { maxTokens: 200, logprobs: true, topLogprobs: 5 },
+        (tokenData) => {
+          tokenCount++;
+          const textEl = document.getElementById('gen-text');
+          if (textEl) {
+            const cursor = textEl.querySelector('.gen-cursor');
+            const span = document.createElement('span');
+            span.className = 'gen-word stream-token';
+            span.textContent = tokenData.content;
+            span.style.animation = 'tokenFadeIn 0.25s ease both';
+            textEl.insertBefore(span, cursor);
+          }
 
-      outputEl.innerHTML = `
-        <div class="card-flat" style="border-color:#0078d444;">
-          <div class="flex items-center justify-between mb-3">
-            <span class="ai-badge">⚡ IA Real — ${result.model}</span>
-            <span class="text-xs text-muted">⏱️ ${result.elapsed}ms${result.usage?.total_tokens ? ' · ' + result.usage.total_tokens + ' tokens' : ''}</span>
-          </div>
-          <div class="gen-text">
-            <span class="gen-prompt">${escapeHtml(text)}</span>
-            <span class="gen-word" style="color:var(--accent);"> ${escapeHtml(result.content)}</span>
-          </div>
-        </div>`;
+          // Show logprobs step card
+          if (stepsEl && tokenData.logprobs) {
+            const lp = tokenData.logprobs;
+            const pct = (lp.prob * 100);
+            const topAlts = lp.topLogprobs.slice(0, 5);
+            const maxProb = Math.max(...topAlts.map(t => t.prob));
+
+            const stepCard = document.createElement('div');
+            stepCard.className = 'card-flat mb-2';
+            stepCard.style.animation = 'fadeSlideIn 0.3s ease both';
+            stepCard.innerHTML = `
+              <div class="flex items-center justify-between mb-1">
+                <span class="badge badge-primary">Token ${tokenCount}</span>
+                <span class="logprob-prob ${pct > 80 ? 'high' : pct > 30 ? 'mid' : 'low'}" style="font-size:0.75rem;">${pct.toFixed(1)}%</span>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                ${topAlts.map(t => {
+                  const altPct = (t.prob * 100);
+                  const isChosen = t.token === lp.token;
+                  return `<span class="token-chip ${isChosen ? 'chosen' : ''}" 
+                    style="--chip-color:${isChosen ? 'var(--accent)' : 'var(--primary)'};">
+                    ${escapeHtml(t.token)} <span class="text-xs" style="opacity:0.7;">${altPct.toFixed(0)}%</span>
+                  </span>`;
+                }).join('')}
+              </div>`;
+            stepsEl.appendChild(stepCard);
+          }
+        }
+      );
+
+      // Finalize
+      const textEl = document.getElementById('gen-text');
+      textEl?.querySelector('.gen-cursor')?.remove();
+      const indicator = outputEl.querySelector('.stream-indicator');
+      if (indicator) indicator.innerHTML = '✅ concluído';
+
+      // Add stats line
+      const statsDiv = document.createElement('div');
+      statsDiv.className = 'flex items-center gap-4 mt-2 text-xs text-muted';
+      statsDiv.innerHTML = `
+        <span>⏱️ ${result.elapsed}ms</span>
+        <span>📊 ${result.usage?.total_tokens || tokenCount} tokens</span>
+        <span>🚀 ${((result.usage?.completion_tokens || tokenCount) / (result.elapsed / 1000)).toFixed(1)} tok/s</span>
+        <span>🤖 ${result.model}</span>`;
+      outputEl.querySelector('.card-flat')?.appendChild(statsDiv);
+
     } catch (err) {
       outputEl.innerHTML = `
         <div class="card-flat config-test-error">
@@ -597,6 +879,7 @@ const LLMDemo = (() => {
         </div>`;
     } finally {
       if (aiBtn) { aiBtn.disabled = false; aiBtn.textContent = '⚡ Gerar com IA Real'; }
+      if (runBtn) runBtn.disabled = false;
     }
   }
 
